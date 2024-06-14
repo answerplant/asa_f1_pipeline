@@ -238,13 +238,6 @@
 									"value": null,
 									"type": "String"
 								},
-								"EndDateTime": {
-									"value": {
-										"value": "@utcnow()",
-										"type": "Expression"
-									},
-									"type": "Datetime"
-								},
 								"Season_EventId": {
 									"value": {
 										"value": "@activity('Log Season Insert Event').output.firstRow.Season_EventId",
