@@ -67,6 +67,10 @@
 				},
 				{
 					"name": "alterRowPermitAll"
+				},
+				{
+					"name": "castPointsToInt",
+					"description": "Cast Points column to type integer"
 				}
 			],
 			"scriptLines": [
@@ -199,7 +203,11 @@
 				"    position!='\\\\N', position\r",
 				"    )) ~> ReplaceRowsNotNull",
 				"RemoveSurplusColumns alterRow(updateIf(true())) ~> alterRowPermitAll",
-				"ReplaceRowsNotNull sink(allowSchemaDrift: true,",
+				"ReplaceRowsNotNull cast(output(",
+				"          position as integer '000'",
+				"     ),",
+				"     errors: true) ~> castPointsToInt",
+				"castPointsToInt sink(allowSchemaDrift: true,",
 				"     validateSchema: false,",
 				"     deletable:false,",
 				"     insertable:true,",
