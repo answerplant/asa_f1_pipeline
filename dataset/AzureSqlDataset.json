@@ -1,0 +1,46 @@
+{
+	"name": "AzureSqlDataset",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "AzureSqlDatabase",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"DatabaseName": {
+					"value": "@dataset().DatabaseName",
+					"type": "Expression"
+				}
+			}
+		},
+		"parameters": {
+			"DatabaseName": {
+				"type": "string",
+				"defaultValue": "DataAcademyAP"
+			},
+			"SchemaName": {
+				"type": "string",
+				"defaultValue": "Practical"
+			},
+			"TableName": {
+				"type": "string",
+				"defaultValue": "Seasons"
+			}
+		},
+		"folder": {
+			"name": "AzureSqlDatabase"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [],
+		"typeProperties": {
+			"schema": {
+				"value": "@dataset().SchemaName",
+				"type": "Expression"
+			},
+			"table": {
+				"value": "@dataset().TableName",
+				"type": "Expression"
+			}
+		}
+	},
+	"type": "Microsoft.Synapse/workspaces/datasets"
+}

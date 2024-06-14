@@ -1,0 +1,216 @@
+{
+	"name": "ARP_Dataflow_F1",
+	"properties": {
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"linkedService": {
+						"referenceName": "answer-data-academy-WorkspaceDefaultStorage",
+						"type": "LinkedServiceReference"
+					},
+					"name": "drivers",
+					"description": "Import drivers data"
+				},
+				{
+					"linkedService": {
+						"referenceName": "answer-data-academy-WorkspaceDefaultStorage",
+						"type": "LinkedServiceReference"
+					},
+					"name": "races",
+					"description": "Add races data"
+				},
+				{
+					"linkedService": {
+						"referenceName": "answer-data-academy-WorkspaceDefaultStorage",
+						"type": "LinkedServiceReference"
+					},
+					"name": "results",
+					"description": "Import results data"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "AzureSqlDataset",
+						"type": "DatasetReference"
+					},
+					"name": "SinkToAzureSQLDB",
+					"rejectedDataLinkedService": {
+						"referenceName": "answer-data-academy-WorkspaceDefaultStorage",
+						"type": "LinkedServiceReference"
+					}
+				}
+			],
+			"transformations": [
+				{
+					"name": "LeftJoinRaces",
+					"description": "Left outer join 'results' and 'races'"
+				},
+				{
+					"name": "LeftJoinDrivers"
+				},
+				{
+					"name": "AddUUID"
+				},
+				{
+					"name": "ConcatdriverFullname"
+				},
+				{
+					"name": "AddYear"
+				},
+				{
+					"name": "RemoveSurplusColumns"
+				},
+				{
+					"name": "ReplaceRowsNotNull"
+				},
+				{
+					"name": "alterRowPermitAll"
+				}
+			],
+			"scriptLines": [
+				"parameters{",
+				"     Container as string (\"synapse\"),",
+				"     Directory as string (\"alastair/f1_data\"),",
+				"     DriversFileName as string (\"drivers.csv\"),",
+				"     RaceFileName as string (\"races.csv\"),",
+				"     ResultsFileName as string (\"results.csv\")",
+				"}",
+				"source(output(",
+				"          driverId as integer,",
+				"          driverRef as string,",
+				"          number as string,",
+				"          code as string,",
+				"          forename as string,",
+				"          surname as string,",
+				"          dob as date,",
+				"          nationality as string,",
+				"          url as string",
+				"     ),",
+				"     useSchema: false,",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false,",
+				"     format: 'delimited',",
+				"     fileSystem: ($Container),",
+				"     folderPath: ($Directory),",
+				"     fileName: ($DriversFileName),",
+				"     columnDelimiter: ',',",
+				"     escapeChar: '\\\\',",
+				"     quoteChar: '\\\"',",
+				"     columnNamesAsHeader: true) ~> drivers",
+				"source(output(",
+				"          raceId as integer,",
+				"          year as integer,",
+				"          round as integer,",
+				"          circuitId as integer,",
+				"          name as string,",
+				"          date as date 'yyyy-MM-dd',",
+				"          time as timestamp 'yyyy-MM-dd\\'T\\'HH:mm:ss.SSS\\'Z\\'',",
+				"          url as string,",
+				"          fp1_date as string,",
+				"          fp1_time as string,",
+				"          fp2_date as string,",
+				"          fp2_time as string,",
+				"          fp3_date as string,",
+				"          fp3_time as string,",
+				"          quali_date as string,",
+				"          quali_time as string,",
+				"          sprint_date as string,",
+				"          sprint_time as string",
+				"     ),",
+				"     useSchema: false,",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false,",
+				"     format: 'delimited',",
+				"     fileSystem: ($Container),",
+				"     folderPath: ($Directory),",
+				"     fileName: ($RaceFileName),",
+				"     columnDelimiter: ',',",
+				"     escapeChar: '\\\\',",
+				"     quoteChar: '\\\"',",
+				"     columnNamesAsHeader: true) ~> races",
+				"source(output(",
+				"          resultId as integer,",
+				"          raceId as integer,",
+				"          driverId as integer,",
+				"          constructorId as integer,",
+				"          number as integer,",
+				"          grid as integer,",
+				"          position as string,",
+				"          positionText as string,",
+				"          positionOrder as integer,",
+				"          points as integer,",
+				"          laps as integer,",
+				"          time as string,",
+				"          milliseconds as string,",
+				"          fastestLap as string,",
+				"          rank as string,",
+				"          fastestLapTime as string,",
+				"          fastestLapSpeed as string,",
+				"          statusId as integer",
+				"     ),",
+				"     useSchema: false,",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false,",
+				"     format: 'delimited',",
+				"     fileSystem: ($Container),",
+				"     folderPath: ($Directory),",
+				"     fileName: ($ResultsFileName),",
+				"     columnDelimiter: ',',",
+				"     escapeChar: '\\\\',",
+				"     quoteChar: '\\\"',",
+				"     columnNamesAsHeader: true) ~> results",
+				"results, races join(results@raceId == races@raceId,",
+				"     joinType:'left',",
+				"     matchType:'exact',",
+				"     ignoreSpaces: false,",
+				"     broadcast: 'auto')~> LeftJoinRaces",
+				"LeftJoinRaces, drivers join(results@driverId == drivers@driverId,",
+				"     joinType:'left',",
+				"     matchType:'exact',",
+				"     ignoreSpaces: false,",
+				"     broadcast: 'auto')~> LeftJoinDrivers",
+				"LeftJoinDrivers derive(Id = uuid()) ~> AddUUID",
+				"AddUUID derive(driverFullname = concat(forename, \" \", surname)) ~> ConcatdriverFullname",
+				"ConcatdriverFullname derive(year = year(date)) ~> AddYear",
+				"AddYear select(mapColumn(",
+				"          Id,",
+				"          year,",
+				"          round,",
+				"          raceName = name,",
+				"          driverFullname,",
+				"          code,",
+				"          position,",
+				"          points,",
+				"          fastestLapTime",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> RemoveSurplusColumns",
+				"alterRowPermitAll derive(fastestLapTime = case(\r",
+				"    fastestLapTime=='\\\\N', '00:00:00',\r",
+				"    fastestLapTime!='\\\\N', fastestLapTime\r",
+				"    ),",
+				"          position = case(\r",
+				"    position=='\\\\N', '0',\r",
+				"    position!='\\\\N', position\r",
+				"    )) ~> ReplaceRowsNotNull",
+				"RemoveSurplusColumns alterRow(updateIf(true())) ~> alterRowPermitAll",
+				"ReplaceRowsNotNull sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:true,",
+				"     upsertable:false,",
+				"     keys:['Id'],",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError') ~> SinkToAzureSQLDB"
+			]
+		}
+	}
+}

@@ -1,0 +1,357 @@
+{
+	"name": "Practical_ARP",
+	"properties": {
+		"activities": [
+			{
+				"name": "Log Season Insert Event",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Set variable Files",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[Log].[Copy_SeasonInsertEvent]",
+						"storedProcedureParameters": {
+							"Container": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.Container",
+									"type": "Expression"
+								}
+							},
+							"Directory": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.Directory",
+									"type": "Expression"
+								}
+							},
+							"Files": {
+								"type": "String",
+								"value": {
+									"value": "@variables('Files')",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "AzureSqlDataset",
+						"type": "DatasetReference",
+						"parameters": {
+							"DatabaseName": {
+								"value": "@pipeline().parameters.DBName",
+								"type": "Expression"
+							},
+							"SchemaName": "NULL",
+							"TableName": "NULL"
+						}
+					}
+				}
+			},
+			{
+				"name": "Data flow Season",
+				"type": "ExecuteDataFlow",
+				"dependsOn": [
+					{
+						"activity": "Stored procedure Remove Year",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Log Season Insert Event",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataflow": {
+						"referenceName": "ARP_Dataflow_F1",
+						"type": "DataFlowReference",
+						"parameters": {
+							"Container": "\"synapse\"",
+							"Directory": "\"alastair/f1_data\"",
+							"DriversFileName": "\"drivers.csv\"",
+							"RaceFileName": "\"races.csv\"",
+							"ResultsFileName": "\"results.csv\""
+						},
+						"datasetParameters": {
+							"SinkToAzureSQLDB": {
+								"DatabaseName": "DataAcademyAP",
+								"SchemaName": "Practical",
+								"TableName": "Seasons"
+							}
+						}
+					},
+					"compute": {
+						"coreCount": 8,
+						"computeType": "General"
+					},
+					"traceLevel": "Fine"
+				}
+			},
+			{
+				"name": "Stored procedure Remove Year",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Set variable Year",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[Practical].[Remove_Year]",
+					"storedProcedureParameters": {
+						"Year": {
+							"value": {
+								"value": "@variables('Year')",
+								"type": "Expression"
+							},
+							"type": "Int64"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "AzureSqlDatabase",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"DatabaseName": {
+							"value": "@pipeline().parameters.DBName",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Set variable Files",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "Files",
+					"value": {
+						"value": "@concat(pipeline().parameters.DriversFileName, ' ', pipeline().parameters.RacesFileName, ' ', pipeline().parameters.ResultsFileName)",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Log Season Update Event Success",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Data flow Season",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[Log].[Season_UpdateEvent]",
+					"storedProcedureParameters": {
+						"Status": {
+							"value": "\"Succeeded\"",
+							"type": "String"
+						},
+						"ErrorMessage": {
+							"value": null,
+							"type": "String"
+						},
+						"EndDateTime": {
+							"value": {
+								"value": "@utcnow()",
+								"type": "Expression"
+							},
+							"type": "Datetime"
+						},
+						"Season_EventId": {
+							"value": {
+								"value": "@activity('Log Season Insert Event').output.firstRow.Season_EventId",
+								"type": "Expression"
+							},
+							"type": "Guid"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "AzureSqlDatabase",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"DatabaseName": {
+							"value": "@pipeline().parameters.DBName",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Log Season Update Event Failure",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Data flow Season",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[Log].[Season_UpdateEvent]",
+					"storedProcedureParameters": {
+						"Status": {
+							"value": "\"Failed\"",
+							"type": "String"
+						},
+						"EndDateTime": {
+							"value": {
+								"value": "getdate()",
+								"type": "Expression"
+							},
+							"type": "Datetime"
+						},
+						"ErrorMessage": {
+							"value": {
+								"value": "@activity('Data flow Season').output.errors[0].Message",
+								"type": "Expression"
+							},
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "AzureSqlDatabase",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"DatabaseName": {
+							"value": "@pipeline().parameters.DBName",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Set variable Year",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "Year",
+					"value": 2000
+				}
+			}
+		],
+		"parameters": {
+			"Container": {
+				"type": "string",
+				"defaultValue": "synapse"
+			},
+			"Directory": {
+				"type": "string",
+				"defaultValue": "alastair/f1_data"
+			},
+			"DriversFileName": {
+				"type": "string",
+				"defaultValue": "drivers.csv"
+			},
+			"RacesFileName": {
+				"type": "string",
+				"defaultValue": "races.csv"
+			},
+			"ResultsFileName": {
+				"type": "string",
+				"defaultValue": "results.csv"
+			},
+			"DBName": {
+				"type": "string",
+				"defaultValue": "DataAcademyAP"
+			},
+			"DBSchema": {
+				"type": "string",
+				"defaultValue": "Practical"
+			},
+			"DBTable": {
+				"type": "string",
+				"defaultValue": "Seasons"
+			},
+			"Year": {
+				"type": "int",
+				"defaultValue": 2000
+			}
+		},
+		"variables": {
+			"Files": {
+				"type": "String",
+				"defaultValue": "\"@{pipeline().parameters.DriversFileName},@{pipeline().parameters.RacesFileName},@{pipeline().parameters.ResultsFileName}\""
+			},
+			"Year": {
+				"type": "Integer"
+			}
+		},
+		"folder": {
+			"name": "workshop"
+		},
+		"annotations": [],
+		"lastPublishTime": "2024-06-13T16:08:53Z"
+	},
+	"type": "Microsoft.Synapse/workspaces/pipelines"
+}

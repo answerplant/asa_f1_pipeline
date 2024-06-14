@@ -1,0 +1,179 @@
+{
+	"name": "f1dataflowyc",
+	"properties": {
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "DataLakeTextDataset",
+						"type": "DatasetReference"
+					},
+					"name": "drivers"
+				},
+				{
+					"dataset": {
+						"referenceName": "DataLakeTextDataset",
+						"type": "DatasetReference"
+					},
+					"name": "results"
+				},
+				{
+					"dataset": {
+						"referenceName": "DataLakeTextDataset",
+						"type": "DatasetReference"
+					},
+					"name": "races"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "AzureSqlTable1",
+						"type": "DatasetReference"
+					},
+					"name": "SinkToSeasons",
+					"rejectedDataLinkedService": {
+						"referenceName": "answer-data-academy-WorkspaceDefaultStorage",
+						"type": "LinkedServiceReference"
+					}
+				}
+			],
+			"transformations": [
+				{
+					"name": "JoinResultsDrivers"
+				},
+				{
+					"name": "JoinAllData"
+				},
+				{
+					"name": "select",
+					"description": "Select required fields"
+				},
+				{
+					"name": "derivedColumn",
+					"description": "Create relevant columns"
+				}
+			],
+			"scriptLines": [
+				"parameters{",
+				"     Directory as string (\"yamin/f1_data\"),",
+				"     DriversFileName as string (\"drivers.csv\"),",
+				"     RacesFileName as string (\"races.csv\"),",
+				"     ResultsFilename as string (\"results.csv\"),",
+				"     Container as string (\"synapse\")",
+				"}",
+				"source(output(",
+				"          driverId as short,",
+				"          driverRef as string,",
+				"          number as string,",
+				"          code as string,",
+				"          forename as string,",
+				"          surname as string,",
+				"          dob as date,",
+				"          nationality as string,",
+				"          url as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false) ~> drivers",
+				"source(output(",
+				"          resultId as short,",
+				"          raceId as short,",
+				"          driverId as short,",
+				"          constructorId as short,",
+				"          number as short,",
+				"          grid as short,",
+				"          position as string,",
+				"          positionText as string,",
+				"          positionOrder as short,",
+				"          points as short,",
+				"          laps as short,",
+				"          time as string,",
+				"          milliseconds as string,",
+				"          fastestLap as string,",
+				"          rank as string,",
+				"          fastestLapTime as string,",
+				"          fastestLapSpeed as string,",
+				"          statusId as short",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false) ~> results",
+				"source(output(",
+				"          raceId as short,",
+				"          year as short,",
+				"          round as short,",
+				"          circuitId as short,",
+				"          name as string,",
+				"          date as date,",
+				"          time as string,",
+				"          url as string,",
+				"          fp1_date as string,",
+				"          fp1_time as string,",
+				"          fp2_date as string,",
+				"          fp2_time as string,",
+				"          fp3_date as string,",
+				"          fp3_time as string,",
+				"          quali_date as string,",
+				"          quali_time as string,",
+				"          sprint_date as string,",
+				"          sprint_time as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false) ~> races",
+				"results, drivers join(results@driverId == drivers@driverId,",
+				"     joinType:'inner',",
+				"     matchType:'exact',",
+				"     ignoreSpaces: false,",
+				"     broadcast: 'auto')~> JoinResultsDrivers",
+				"JoinResultsDrivers, races join(results@raceId == races@raceId,",
+				"     joinType:'inner',",
+				"     matchType:'exact',",
+				"     ignoreSpaces: false,",
+				"     broadcast: 'auto')~> JoinAllData",
+				"derivedColumn select(mapColumn(",
+				"          Id,",
+				"          year,",
+				"          round,",
+				"          raceName = name,",
+				"          driverFullname,",
+				"          code,",
+				"          position,",
+				"          points",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> select",
+				"JoinAllData derive(Id = uuid(),",
+				"          year = year,",
+				"          round = round,",
+				"          raceName = name,",
+				"          driverFullname = concat(forename,' ', surname),",
+				"          code = code,",
+				"          position = toShort(position),",
+				"          points = points) ~> derivedColumn",
+				"select sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          Id as string,",
+				"          year as integer,",
+				"          round as integer,",
+				"          raceName as string,",
+				"          driverFullname as string,",
+				"          code as string,",
+				"          postion as integer,",
+				"          points as integer",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError') ~> SinkToSeasons"
+			]
+		}
+	}
+}

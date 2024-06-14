@@ -1,0 +1,285 @@
+{
+	"name": "Workshop_ARP",
+	"properties": {
+		"activities": [
+			{
+				"name": "Copy CSV to DB",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Log insert event",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "DelimitedTextSource",
+						"storeSettings": {
+							"type": "AzureBlobFSReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "DelimitedTextReadSettings"
+						}
+					},
+					"sink": {
+						"type": "AzureSqlSink",
+						"writeBehavior": "insert",
+						"sqlWriterUseTableLock": false
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "DataLakeTextDataset",
+						"type": "DatasetReference",
+						"parameters": {
+							"Container": {
+								"value": "@pipeline().parameters.Container",
+								"type": "Expression"
+							},
+							"Directory": {
+								"value": "@pipeline().parameters.Directory",
+								"type": "Expression"
+							},
+							"FileName": {
+								"value": "@pipeline().parameters.File_name",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "AzureSqlDataset",
+						"type": "DatasetReference",
+						"parameters": {
+							"DatabaseName": {
+								"value": "@pipeline().parameters.DBName",
+								"type": "Expression"
+							},
+							"SchemaName": {
+								"value": "@pipeline().parameters.DBSchema",
+								"type": "Expression"
+							},
+							"TableName": {
+								"value": "@pipeline().parameters.DBTable",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			},
+			{
+				"name": "Log insert event",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[Log].[Copy_InsertEvent]",
+						"storedProcedureParameters": {
+							"Container": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.Container",
+									"type": "Expression"
+								}
+							},
+							"Directory": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.Directory",
+									"type": "Expression"
+								}
+							},
+							"Filename": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.File_name",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "AzureSqlDataset",
+						"type": "DatasetReference",
+						"parameters": {
+							"DatabaseName": {
+								"value": "@pipeline().parameters.DBName",
+								"type": "Expression"
+							},
+							"SchemaName": "NULL",
+							"TableName": "NULL"
+						}
+					}
+				}
+			},
+			{
+				"name": "Update Log Success",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Copy CSV to DB",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[Log].[Copy_UpdateEvent]",
+					"storedProcedureParameters": {
+						"Copy_EventID": {
+							"value": {
+								"value": "@activity('Log insert event').output.firstRow.Copy_EventId",
+								"type": "Expression"
+							},
+							"type": "Guid"
+						},
+						"ErrorMessage": {
+							"value": null,
+							"type": "String"
+						},
+						"Status": {
+							"value": "\"Success\"",
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "AzureSqlDatabase",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"DatabaseName": {
+							"value": "@pipeline().parameters.DBName",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Update Log Failed",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Copy CSV to DB",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[Log].[Copy_UpdateEvent]",
+					"storedProcedureParameters": {
+						"Copy_EventID": {
+							"value": {
+								"value": "@activity('Log insert event').output.firstRow.Copy_EventId",
+								"type": "Expression"
+							},
+							"type": "Guid"
+						},
+						"ErrorMessage": {
+							"value": {
+								"value": "@activity('Copy CSV to DB').output.errors[0].Message",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"Status": {
+							"value": "\"Failed\"",
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "AzureSqlDatabase",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"DatabaseName": {
+							"value": "@pipeline().parameters.DBName",
+							"type": "Expression"
+						}
+					}
+				}
+			}
+		],
+		"parameters": {
+			"Container": {
+				"type": "string",
+				"defaultValue": "synapse"
+			},
+			"Directory": {
+				"type": "string",
+				"defaultValue": "workshop/f1_data"
+			},
+			"File_name": {
+				"type": "string",
+				"defaultValue": "circuits.csv"
+			},
+			"DBTable": {
+				"type": "string",
+				"defaultValue": "Circuits"
+			},
+			"DBSchema": {
+				"type": "string",
+				"defaultValue": "Workshop"
+			},
+			"DBName": {
+				"type": "string",
+				"defaultValue": "DataAcademyAP"
+			}
+		},
+		"folder": {
+			"name": "workshop"
+		},
+		"annotations": [],
+		"lastPublishTime": "2024-06-11T13:20:17Z"
+	},
+	"type": "Microsoft.Synapse/workspaces/pipelines"
+}

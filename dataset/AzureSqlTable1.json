@@ -1,0 +1,66 @@
+{
+	"name": "AzureSqlTable1",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "AzureSqlDatabase",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"DatabaseName": {
+					"value": "@dataset().DatabaseName",
+					"type": "Expression"
+				}
+			}
+		},
+		"parameters": {
+			"DatabaseName": {
+				"type": "string",
+				"defaultValue": "DataAcademyYC"
+			}
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "Id",
+				"type": "uniqueidentifier"
+			},
+			{
+				"name": "year",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "round",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "raceName",
+				"type": "varchar"
+			},
+			{
+				"name": "driverFullname",
+				"type": "varchar"
+			},
+			{
+				"name": "code",
+				"type": "varchar"
+			},
+			{
+				"name": "postion",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "points",
+				"type": "int",
+				"precision": 10
+			}
+		],
+		"typeProperties": {
+			"schema": "Practical",
+			"table": "Seasons"
+		}
+	},
+	"type": "Microsoft.Synapse/workspaces/datasets"
+}
