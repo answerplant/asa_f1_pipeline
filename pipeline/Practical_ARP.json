@@ -70,15 +70,15 @@
 				"type": "ExecuteDataFlow",
 				"dependsOn": [
 					{
-						"activity": "Stored procedure Remove Year",
+						"activity": "Log Season Insert Event",
 						"dependencyConditions": [
 							"Succeeded"
 						]
 					},
 					{
-						"activity": "Log Season Insert Event",
+						"activity": "IfNoRowsThenRunDataFlow",
 						"dependencyConditions": [
-							"Succeeded"
+							"Failed"
 						]
 					}
 				],
@@ -290,6 +290,67 @@
 				"typeProperties": {
 					"variableName": "Year",
 					"value": 2000
+				}
+			},
+			{
+				"name": "IfNoRowsThenRunDataFlow",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "Stored procedure Check Year",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@activity('Stored procedure Check Year').output",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Stored procedure Check Year",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Set variable Year",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[Practical].[Check_Year]",
+					"storedProcedureParameters": {
+						"Year": {
+							"value": {
+								"value": "@variables('Year')",
+								"type": "Expression"
+							},
+							"type": "Int64"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "AzureSqlDatabase",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"DatabaseName": {
+							"value": "@pipeline().parameters.DBName",
+							"type": "Expression"
+						}
+					}
 				}
 			}
 		],
