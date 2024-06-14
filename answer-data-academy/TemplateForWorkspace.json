@@ -1,0 +1,2137 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"workspaceName": {
+			"type": "string",
+			"metadata": "Workspace name",
+			"defaultValue": "answer-data-academy"
+		},
+		"AzureSqlDatabase_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'AzureSqlDatabase'"
+		},
+		"answer-data-academy-WorkspaceDefaultSqlServer_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'answer-data-academy-WorkspaceDefaultSqlServer'",
+			"defaultValue": "Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=tcp:answer-data-academy.sql.azuresynapse.net,1433;Initial Catalog=@{linkedService().DBName}"
+		},
+		"answer-data-academy-WorkspaceDefaultStorage_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://answerdatatestadls.dfs.core.windows.net"
+		}
+	},
+	"variables": {
+		"workspaceId": "[concat('Microsoft.Synapse/workspaces/', parameters('workspaceName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('workspaceName'), '/Practical_ARP')]",
+			"type": "Microsoft.Synapse/workspaces/pipelines",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"activities": [
+					{
+						"name": "Log Season Insert Event",
+						"type": "Lookup",
+						"dependsOn": [
+							{
+								"activity": "Set variable Files",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderStoredProcedureName": "[Log].[Copy_SeasonInsertEvent]",
+								"storedProcedureParameters": {
+									"Container": {
+										"type": "String",
+										"value": {
+											"value": "@pipeline().parameters.Container",
+											"type": "Expression"
+										}
+									},
+									"Directory": {
+										"type": "String",
+										"value": {
+											"value": "@pipeline().parameters.Directory",
+											"type": "Expression"
+										}
+									},
+									"Files": {
+										"type": "String",
+										"value": {
+											"value": "@variables('Files')",
+											"type": "Expression"
+										}
+									}
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "AzureSqlDataset",
+								"type": "DatasetReference",
+								"parameters": {
+									"DatabaseName": {
+										"value": "@pipeline().parameters.DBName",
+										"type": "Expression"
+									},
+									"SchemaName": "NULL",
+									"TableName": "NULL"
+								}
+							}
+						}
+					},
+					{
+						"name": "Data flow Season",
+						"type": "ExecuteDataFlow",
+						"dependsOn": [
+							{
+								"activity": "Stored procedure Remove Year",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Log Season Insert Event",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "ARP_Dataflow_F1",
+								"type": "DataFlowReference",
+								"parameters": {
+									"Container": "\"synapse\"",
+									"Directory": "\"alastair/f1_data\"",
+									"DriversFileName": "\"drivers.csv\"",
+									"RaceFileName": "\"races.csv\"",
+									"ResultsFileName": "\"results.csv\""
+								},
+								"datasetParameters": {
+									"drivers": {},
+									"races": {},
+									"results": {},
+									"SinkToAzureSQLDB": {
+										"DatabaseName": "DataAcademyAP",
+										"SchemaName": "Practical",
+										"TableName": "Seasons"
+									}
+								}
+							},
+							"staging": {},
+							"compute": {
+								"coreCount": 8,
+								"computeType": "General"
+							},
+							"traceLevel": "Fine"
+						}
+					},
+					{
+						"name": "Stored procedure Remove Year",
+						"type": "SqlServerStoredProcedure",
+						"dependsOn": [
+							{
+								"activity": "Set variable Year",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[Practical].[Remove_Year]",
+							"storedProcedureParameters": {
+								"Year": {
+									"value": {
+										"value": "@variables('Year')",
+										"type": "Expression"
+									},
+									"type": "Int64"
+								}
+							}
+						},
+						"linkedServiceName": {
+							"referenceName": "AzureSqlDatabase",
+							"type": "LinkedServiceReference",
+							"parameters": {
+								"DatabaseName": {
+									"value": "@pipeline().parameters.DBName",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "Set variable Files",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "Files",
+							"value": {
+								"value": "@concat(pipeline().parameters.DriversFileName, ' ', pipeline().parameters.RacesFileName, ' ', pipeline().parameters.ResultsFileName)",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Log Season Update Event Success",
+						"type": "SqlServerStoredProcedure",
+						"dependsOn": [
+							{
+								"activity": "Data flow Season",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[Log].[Season_UpdateEvent]",
+							"storedProcedureParameters": {
+								"Status": {
+									"value": "\"Succeeded\"",
+									"type": "String"
+								},
+								"ErrorMessage": {
+									"value": null,
+									"type": "String"
+								},
+								"EndDateTime": {
+									"value": {
+										"value": "@utcnow()",
+										"type": "Expression"
+									},
+									"type": "Datetime"
+								},
+								"Season_EventId": {
+									"value": {
+										"value": "@activity('Log Season Insert Event').output.firstRow.Season_EventId",
+										"type": "Expression"
+									},
+									"type": "Guid"
+								}
+							}
+						},
+						"linkedServiceName": {
+							"referenceName": "AzureSqlDatabase",
+							"type": "LinkedServiceReference",
+							"parameters": {
+								"DatabaseName": {
+									"value": "@pipeline().parameters.DBName",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "Log Season Update Event Failure",
+						"type": "SqlServerStoredProcedure",
+						"dependsOn": [
+							{
+								"activity": "Data flow Season",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[Log].[Season_UpdateEvent]",
+							"storedProcedureParameters": {
+								"Status": {
+									"value": "\"Failed\"",
+									"type": "String"
+								},
+								"EndDateTime": {
+									"value": {
+										"value": "getdate()",
+										"type": "Expression"
+									},
+									"type": "Datetime"
+								},
+								"ErrorMessage": {
+									"value": {
+										"value": "@activity('Data flow Season').output.errors[0].Message",
+										"type": "Expression"
+									},
+									"type": "String"
+								}
+							}
+						},
+						"linkedServiceName": {
+							"referenceName": "AzureSqlDatabase",
+							"type": "LinkedServiceReference",
+							"parameters": {
+								"DatabaseName": {
+									"value": "@pipeline().parameters.DBName",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "Set variable Year",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "Year",
+							"value": 2000
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"Container": {
+						"type": "string",
+						"defaultValue": "synapse"
+					},
+					"Directory": {
+						"type": "string",
+						"defaultValue": "alastair/f1_data"
+					},
+					"DriversFileName": {
+						"type": "string",
+						"defaultValue": "drivers.csv"
+					},
+					"RacesFileName": {
+						"type": "string",
+						"defaultValue": "races.csv"
+					},
+					"ResultsFileName": {
+						"type": "string",
+						"defaultValue": "results.csv"
+					},
+					"DBName": {
+						"type": "string",
+						"defaultValue": "DataAcademyAP"
+					},
+					"DBSchema": {
+						"type": "string",
+						"defaultValue": "Practical"
+					},
+					"DBTable": {
+						"type": "string",
+						"defaultValue": "Seasons"
+					},
+					"Year": {
+						"type": "int",
+						"defaultValue": 2000
+					}
+				},
+				"variables": {
+					"Files": {
+						"type": "String",
+						"defaultValue": "\"@{pipeline().parameters.DriversFileName},@{pipeline().parameters.RacesFileName},@{pipeline().parameters.ResultsFileName}\""
+					},
+					"Year": {
+						"type": "Integer"
+					}
+				},
+				"folder": {
+					"name": "workshop"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-06-13T16:08:53Z"
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/datasets/AzureSqlDataset')]",
+				"[concat(variables('workspaceId'), '/dataflows/ARP_Dataflow_F1')]",
+				"[concat(variables('workspaceId'), '/linkedServices/AzureSqlDatabase')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/Workshop Master')]",
+			"type": "Microsoft.Synapse/workspaces/pipelines",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"activities": [
+					{
+						"name": "Copy CSV to DB",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Log Insert Event",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "DelimitedTextSource",
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "DelimitedTextReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DataLakeTextDataset",
+								"type": "DatasetReference",
+								"parameters": {
+									"Container": {
+										"value": "@pipeline().parameters.Container",
+										"type": "Expression"
+									},
+									"Directory": {
+										"value": "@pipeline().parameters.Directory",
+										"type": "Expression"
+									},
+									"FileName": {
+										"value": "@pipeline().parameters.File_name",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "AzureSqlDataset",
+								"type": "DatasetReference",
+								"parameters": {
+									"DatabaseName": {
+										"value": "@pipeline().parameters.DBName",
+										"type": "Expression"
+									},
+									"SchemaName": {
+										"value": "@pipeline().parameters.DBSchema",
+										"type": "Expression"
+									},
+									"TableName": {
+										"value": "@pipeline().parameters.DBTable",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Log Insert Event",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderStoredProcedureName": "[Log].[Copy_InsertEvent]",
+								"storedProcedureParameters": {
+									"Container": {
+										"type": "String",
+										"value": {
+											"value": "@pipeline().parameters.Container",
+											"type": "Expression"
+										}
+									},
+									"Directory": {
+										"type": "String",
+										"value": {
+											"value": "@pipeline().parameters.Directory",
+											"type": "Expression"
+										}
+									},
+									"Filename": {
+										"type": "String",
+										"value": {
+											"value": "@pipeline().parameters.File_name",
+											"type": "Expression"
+										}
+									}
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "AzureSqlDataset",
+								"type": "DatasetReference",
+								"parameters": {
+									"DatabaseName": {
+										"value": "@pipeline().parameters.DBName",
+										"type": "Expression"
+									},
+									"SchemaName": "NULL",
+									"TableName": "NULL"
+								}
+							}
+						}
+					},
+					{
+						"name": "Update Log Success",
+						"type": "SqlServerStoredProcedure",
+						"dependsOn": [
+							{
+								"activity": "Copy CSV to DB",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[Log].[Copy_UpdateEvent]",
+							"storedProcedureParameters": {
+								"Copy_EventId": {
+									"value": {
+										"value": "@activity('Log Insert Event').output.firstRow.Copy_EventId",
+										"type": "Expression"
+									},
+									"type": "Guid"
+								},
+								"ErrorMessage": {
+									"value": null,
+									"type": "String"
+								},
+								"Status": {
+									"value": "Success",
+									"type": "String"
+								}
+							}
+						},
+						"linkedServiceName": {
+							"referenceName": "AzureSqlDatabase",
+							"type": "LinkedServiceReference",
+							"parameters": {
+								"DatabaseName": {
+									"value": "@pipeline().parameters.DBName",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "Update Log Failed",
+						"type": "SqlServerStoredProcedure",
+						"dependsOn": [
+							{
+								"activity": "Copy CSV to DB",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[Log].[Copy_UpdateEvent]",
+							"storedProcedureParameters": {
+								"Copy_EventId": {
+									"value": {
+										"value": "@activity('Log Insert Event').output.firstRow.Copy_EventId",
+										"type": "Expression"
+									},
+									"type": "Guid"
+								},
+								"ErrorMessage": {
+									"value": {
+										"value": "@activity('Copy CSV to DB').output.errors[0].Message",
+										"type": "Expression"
+									},
+									"type": "String"
+								},
+								"Status": {
+									"value": "Failed",
+									"type": "String"
+								}
+							}
+						},
+						"linkedServiceName": {
+							"referenceName": "AzureSqlDatabase",
+							"type": "LinkedServiceReference",
+							"parameters": {
+								"DatabaseName": {
+									"value": "@pipeline().parameters.DBName",
+									"type": "Expression"
+								}
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"Container": {
+						"type": "string",
+						"defaultValue": "synapse"
+					},
+					"Directory": {
+						"type": "string",
+						"defaultValue": "workshop/f1_data"
+					},
+					"File_name": {
+						"type": "string",
+						"defaultValue": "circuits.csv"
+					},
+					"DBTable": {
+						"type": "string",
+						"defaultValue": "Circuits"
+					},
+					"DBSchema": {
+						"type": "string",
+						"defaultValue": "Workshop"
+					},
+					"DBName": {
+						"type": "string",
+						"defaultValue": "DataAcademyAP"
+					}
+				},
+				"folder": {
+					"name": "workshop"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-06-11T10:40:09Z"
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/datasets/DataLakeTextDataset')]",
+				"[concat(variables('workspaceId'), '/datasets/AzureSqlDataset')]",
+				"[concat(variables('workspaceId'), '/linkedServices/AzureSqlDatabase')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/Workshop_ARP')]",
+			"type": "Microsoft.Synapse/workspaces/pipelines",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"activities": [
+					{
+						"name": "Copy CSV to DB",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Log insert event",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "DelimitedTextSource",
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "DelimitedTextReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DataLakeTextDataset",
+								"type": "DatasetReference",
+								"parameters": {
+									"Container": {
+										"value": "@pipeline().parameters.Container",
+										"type": "Expression"
+									},
+									"Directory": {
+										"value": "@pipeline().parameters.Directory",
+										"type": "Expression"
+									},
+									"FileName": {
+										"value": "@pipeline().parameters.File_name",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "AzureSqlDataset",
+								"type": "DatasetReference",
+								"parameters": {
+									"DatabaseName": {
+										"value": "@pipeline().parameters.DBName",
+										"type": "Expression"
+									},
+									"SchemaName": {
+										"value": "@pipeline().parameters.DBSchema",
+										"type": "Expression"
+									},
+									"TableName": {
+										"value": "@pipeline().parameters.DBTable",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Log insert event",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderStoredProcedureName": "[Log].[Copy_InsertEvent]",
+								"storedProcedureParameters": {
+									"Container": {
+										"type": "String",
+										"value": {
+											"value": "@pipeline().parameters.Container",
+											"type": "Expression"
+										}
+									},
+									"Directory": {
+										"type": "String",
+										"value": {
+											"value": "@pipeline().parameters.Directory",
+											"type": "Expression"
+										}
+									},
+									"Filename": {
+										"type": "String",
+										"value": {
+											"value": "@pipeline().parameters.File_name",
+											"type": "Expression"
+										}
+									}
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "AzureSqlDataset",
+								"type": "DatasetReference",
+								"parameters": {
+									"DatabaseName": {
+										"value": "@pipeline().parameters.DBName",
+										"type": "Expression"
+									},
+									"SchemaName": "NULL",
+									"TableName": "NULL"
+								}
+							}
+						}
+					},
+					{
+						"name": "Update Log Success",
+						"type": "SqlServerStoredProcedure",
+						"dependsOn": [
+							{
+								"activity": "Copy CSV to DB",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[Log].[Copy_UpdateEvent]",
+							"storedProcedureParameters": {
+								"Copy_EventID": {
+									"value": {
+										"value": "@activity('Log insert event').output.firstRow.Copy_EventId",
+										"type": "Expression"
+									},
+									"type": "Guid"
+								},
+								"ErrorMessage": {
+									"value": null,
+									"type": "String"
+								},
+								"Status": {
+									"value": "\"Success\"",
+									"type": "String"
+								}
+							}
+						},
+						"linkedServiceName": {
+							"referenceName": "AzureSqlDatabase",
+							"type": "LinkedServiceReference",
+							"parameters": {
+								"DatabaseName": {
+									"value": "@pipeline().parameters.DBName",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "Update Log Failed",
+						"type": "SqlServerStoredProcedure",
+						"dependsOn": [
+							{
+								"activity": "Copy CSV to DB",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[Log].[Copy_UpdateEvent]",
+							"storedProcedureParameters": {
+								"Copy_EventID": {
+									"value": {
+										"value": "@activity('Log insert event').output.firstRow.Copy_EventId",
+										"type": "Expression"
+									},
+									"type": "Guid"
+								},
+								"ErrorMessage": {
+									"value": {
+										"value": "@activity('Copy CSV to DB').output.errors[0].Message",
+										"type": "Expression"
+									},
+									"type": "String"
+								},
+								"Status": {
+									"value": "\"Failed\"",
+									"type": "String"
+								}
+							}
+						},
+						"linkedServiceName": {
+							"referenceName": "AzureSqlDatabase",
+							"type": "LinkedServiceReference",
+							"parameters": {
+								"DatabaseName": {
+									"value": "@pipeline().parameters.DBName",
+									"type": "Expression"
+								}
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"Container": {
+						"type": "string",
+						"defaultValue": "synapse"
+					},
+					"Directory": {
+						"type": "string",
+						"defaultValue": "workshop/f1_data"
+					},
+					"File_name": {
+						"type": "string",
+						"defaultValue": "circuits.csv"
+					},
+					"DBTable": {
+						"type": "string",
+						"defaultValue": "Circuits"
+					},
+					"DBSchema": {
+						"type": "string",
+						"defaultValue": "Workshop"
+					},
+					"DBName": {
+						"type": "string",
+						"defaultValue": "DataAcademyAP"
+					}
+				},
+				"folder": {
+					"name": "workshop"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-06-11T13:20:17Z"
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/datasets/DataLakeTextDataset')]",
+				"[concat(variables('workspaceId'), '/datasets/AzureSqlDataset')]",
+				"[concat(variables('workspaceId'), '/linkedServices/AzureSqlDatabase')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/driver results pipeline yc')]",
+			"type": "Microsoft.Synapse/workspaces/pipelines",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"description": "Create a pipeline with a name that is unique within the workspace (append initials to Pipeline and Data Flow names). This pipeline will take the following parameters: Container, Directory, DriversFileName, RacesFileName, ResultsFilename, DBName, DBSchema, DBTable, Year",
+				"activities": [
+					{
+						"name": "Files",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "Files",
+							"value": {
+								"value": "@concat(pipeline().parameters.DriversFileName, ',', pipeline().parameters.RacesFileName, ',', pipeline().parameters.ResultsFileName)\r\n",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Insert Logging Event",
+						"type": "SqlServerStoredProcedure",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[Log].[Season_InsertEvents]",
+							"storedProcedureParameters": {
+								"Container": {
+									"value": {
+										"value": "@pipeline().parameters.Container",
+										"type": "Expression"
+									},
+									"type": "String"
+								},
+								"Directory": {
+									"value": {
+										"value": "@pipeline().parameters.Directory",
+										"type": "Expression"
+									},
+									"type": "String"
+								},
+								"Files": {
+									"value": "",
+									"type": "String"
+								}
+							}
+						},
+						"linkedServiceName": {
+							"referenceName": "AzureSqlDatabase",
+							"type": "LinkedServiceReference",
+							"parameters": {
+								"DatabaseName": {
+									"value": "@pipeline().parameters.DBName",
+									"type": "Expression"
+								}
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"Container": {
+						"type": "string",
+						"defaultValue": "synapse"
+					},
+					"Directory": {
+						"type": "string",
+						"defaultValue": "workshop/f1_data"
+					},
+					"DriversFileName": {
+						"type": "string",
+						"defaultValue": "drivers.csv"
+					},
+					"RacesFileName": {
+						"type": "string",
+						"defaultValue": "races.csv"
+					},
+					"ResultsFileName": {
+						"type": "string",
+						"defaultValue": "results.csv"
+					},
+					"DBName": {
+						"type": "string",
+						"defaultValue": "DataAcademyYC"
+					},
+					"DBSchema": {
+						"type": "string"
+					},
+					"DBTable": {
+						"type": "string"
+					},
+					"Year": {
+						"type": "string"
+					}
+				},
+				"variables": {
+					"Files": {
+						"type": "String"
+					},
+					"CombinedFiles": {
+						"type": "String"
+					}
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-06-13T11:14:47Z"
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/linkedServices/AzureSqlDatabase')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/yc f1 pipeline')]",
+			"type": "Microsoft.Synapse/workspaces/pipelines",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"activities": [
+					{
+						"name": "Copy data To CSV",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Log Insert Event",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "DelimitedTextSource",
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "DelimitedTextReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DataLakeTextDataset",
+								"type": "DatasetReference",
+								"parameters": {
+									"Container": {
+										"value": "@pipeline().parameters.Container",
+										"type": "Expression"
+									},
+									"Directory": {
+										"value": "@pipeline().parameters.Directory",
+										"type": "Expression"
+									},
+									"FileName": {
+										"value": "@pipeline().parameters.File_name",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "AzureSqlDataset",
+								"type": "DatasetReference",
+								"parameters": {
+									"DatabaseName": {
+										"value": "@pipeline().parameters.DBName",
+										"type": "Expression"
+									},
+									"SchemaName": {
+										"value": "@pipeline().parameters.DBSchema",
+										"type": "Expression"
+									},
+									"TableName": {
+										"value": "@pipeline().parameters.DBTable",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Log Insert Event",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderStoredProcedureName": "[Log].[Copy_InsertEvent]",
+								"storedProcedureParameters": {
+									"Container": {
+										"type": "String",
+										"value": {
+											"value": "@pipeline().parameters.Container",
+											"type": "Expression"
+										}
+									},
+									"Directory": {
+										"type": "String",
+										"value": {
+											"value": "@pipeline().parameters.Directory",
+											"type": "Expression"
+										}
+									},
+									"Filename": {
+										"type": "String",
+										"value": {
+											"value": "@pipeline().parameters.File_name",
+											"type": "Expression"
+										}
+									}
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "AzureSqlDataset",
+								"type": "DatasetReference",
+								"parameters": {
+									"DatabaseName": {
+										"value": "@pipeline().parameters.DBName",
+										"type": "Expression"
+									},
+									"SchemaName": "NULL",
+									"TableName": "NULL"
+								}
+							}
+						}
+					},
+					{
+						"name": "Update Log Success",
+						"type": "SqlServerStoredProcedure",
+						"dependsOn": [
+							{
+								"activity": "Copy data To CSV",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[Log].[Copy_UpdateEvent]",
+							"storedProcedureParameters": {
+								"Copy_EventId": {
+									"value": {
+										"value": "@activity('Log Insert Event').output.firstRow.Copy_EventId",
+										"type": "Expression"
+									},
+									"type": "Guid"
+								},
+								"ErrorMessage": {
+									"value": null,
+									"type": "String"
+								},
+								"Status": {
+									"value": "\"Sucess\" ",
+									"type": "String"
+								}
+							}
+						},
+						"linkedServiceName": {
+							"referenceName": "AzureSqlDatabase",
+							"type": "LinkedServiceReference",
+							"parameters": {
+								"DatabaseName": {
+									"value": "@pipeline().parameters.DBName",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "Update Log Failed",
+						"type": "SqlServerStoredProcedure",
+						"dependsOn": [
+							{
+								"activity": "Copy data To CSV",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[Log].[Copy_UpdateEvent]",
+							"storedProcedureParameters": {
+								"Copy_EventId": {
+									"value": {
+										"value": "@activity('Log Insert Event').output.firstRow.Copy_EventId",
+										"type": "Expression"
+									},
+									"type": "Guid"
+								},
+								"ErrorMessage": {
+									"value": {
+										"value": "@activity('Copy data To CSV').output.errors[0].Message",
+										"type": "Expression"
+									},
+									"type": "String"
+								},
+								"Status": {
+									"value": "\"Failed\" ",
+									"type": "String"
+								}
+							}
+						},
+						"linkedServiceName": {
+							"referenceName": "AzureSqlDatabase",
+							"type": "LinkedServiceReference",
+							"parameters": {
+								"DatabaseName": {
+									"value": "@pipeline().parameters.DBName",
+									"type": "Expression"
+								}
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"Container": {
+						"type": "string",
+						"defaultValue": "synapse"
+					},
+					"Directory": {
+						"type": "string",
+						"defaultValue": "workshop/f1_data"
+					},
+					"File_name": {
+						"type": "string",
+						"defaultValue": "circuits.csv"
+					},
+					"DBTable": {
+						"type": "string",
+						"defaultValue": "Circuits"
+					},
+					"DBSchema": {
+						"type": "string",
+						"defaultValue": "Workshop"
+					},
+					"DBName": {
+						"type": "string",
+						"defaultValue": "DataAcademyYC "
+					}
+				},
+				"folder": {
+					"name": "workshop"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-06-11T10:46:06Z"
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/datasets/DataLakeTextDataset')]",
+				"[concat(variables('workspaceId'), '/datasets/AzureSqlDataset')]",
+				"[concat(variables('workspaceId'), '/linkedServices/AzureSqlDatabase')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/AzureSqlDataset')]",
+			"type": "Microsoft.Synapse/workspaces/datasets",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureSqlDatabase",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"DatabaseName": {
+							"value": "@dataset().DatabaseName",
+							"type": "Expression"
+						}
+					}
+				},
+				"parameters": {
+					"DatabaseName": {
+						"type": "string",
+						"defaultValue": "DataAcademyAP"
+					},
+					"SchemaName": {
+						"type": "string",
+						"defaultValue": "Practical"
+					},
+					"TableName": {
+						"type": "string",
+						"defaultValue": "Seasons"
+					}
+				},
+				"folder": {
+					"name": "AzureSqlDatabase"
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [],
+				"typeProperties": {
+					"schema": {
+						"value": "@dataset().SchemaName",
+						"type": "Expression"
+					},
+					"table": {
+						"value": "@dataset().TableName",
+						"type": "Expression"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/linkedServices/AzureSqlDatabase')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/AzureSqlTable1')]",
+			"type": "Microsoft.Synapse/workspaces/datasets",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureSqlDatabase",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"DatabaseName": {
+							"value": "@dataset().DatabaseName",
+							"type": "Expression"
+						}
+					}
+				},
+				"parameters": {
+					"DatabaseName": {
+						"type": "string",
+						"defaultValue": "DataAcademyYC"
+					}
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [
+					{
+						"name": "Id",
+						"type": "uniqueidentifier"
+					},
+					{
+						"name": "year",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "round",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "raceName",
+						"type": "varchar"
+					},
+					{
+						"name": "driverFullname",
+						"type": "varchar"
+					},
+					{
+						"name": "code",
+						"type": "varchar"
+					},
+					{
+						"name": "postion",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "points",
+						"type": "int",
+						"precision": 10
+					}
+				],
+				"typeProperties": {
+					"schema": "Practical",
+					"table": "Seasons"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/linkedServices/AzureSqlDatabase')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/DataLakeBinaryDataset')]",
+			"type": "Microsoft.Synapse/workspaces/datasets",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "answer-data-academy-WorkspaceDefaultStorage",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"Container": {
+						"type": "string"
+					},
+					"Directory": {
+						"type": "string"
+					},
+					"File_name": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "AzureDataLakeStorage"
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": {
+							"value": "@dataset().File_name",
+							"type": "Expression"
+						},
+						"folderPath": {
+							"value": "@dataset().Directory",
+							"type": "Expression"
+						},
+						"fileSystem": {
+							"value": "@dataset().Container",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/linkedServices/answer-data-academy-WorkspaceDefaultStorage')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/DataLakeTextDataset')]",
+			"type": "Microsoft.Synapse/workspaces/datasets",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "answer-data-academy-WorkspaceDefaultStorage",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"Container": {
+						"type": "string"
+					},
+					"Directory": {
+						"type": "string"
+					},
+					"FileName": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "AzureDataLakeStorage"
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": {
+							"value": "@dataset().FileName",
+							"type": "Expression"
+						},
+						"folderPath": {
+							"value": "@dataset().Directory",
+							"type": "Expression"
+						},
+						"fileSystem": {
+							"value": "@dataset().Container",
+							"type": "Expression"
+						}
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": true,
+					"quoteChar": "\""
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/linkedServices/answer-data-academy-WorkspaceDefaultStorage')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/AzureSqlDatabase')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"parameters": {
+					"DatabaseName": {
+						"type": "string",
+						"defaultValue": "DataAcademyAP"
+					}
+				},
+				"annotations": [],
+				"type": "AzureSqlDatabase",
+				"typeProperties": {
+					"connectionString": "[parameters('AzureSqlDatabase_connectionString')]"
+				},
+				"connectVia": {
+					"referenceName": "AutoResolveIntegrationRuntime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/answer-data-academy-WorkspaceDefaultSqlServer')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"parameters": {
+					"DBName": {
+						"type": "String"
+					}
+				},
+				"annotations": [],
+				"type": "AzureSqlDW",
+				"typeProperties": {
+					"connectionString": "[parameters('answer-data-academy-WorkspaceDefaultSqlServer_connectionString')]"
+				},
+				"connectVia": {
+					"referenceName": "AutoResolveIntegrationRuntime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/answer-data-academy-WorkspaceDefaultStorage')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobFS",
+				"typeProperties": {
+					"url": "[parameters('answer-data-academy-WorkspaceDefaultStorage_properties_typeProperties_url')]"
+				},
+				"connectVia": {
+					"referenceName": "AutoResolveIntegrationRuntime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/AutoResolveIntegrationRuntime')]",
+			"type": "Microsoft.Synapse/workspaces/integrationRuntimes",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"type": "Managed",
+				"typeProperties": {
+					"computeProperties": {
+						"location": "AutoResolve",
+						"dataFlowProperties": {
+							"computeType": "General",
+							"coreCount": 8,
+							"timeToLive": 0
+						}
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/ARP_Dataflow_F1')]",
+			"type": "Microsoft.Synapse/workspaces/dataflows",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"linkedService": {
+								"referenceName": "answer-data-academy-WorkspaceDefaultStorage",
+								"type": "LinkedServiceReference"
+							},
+							"name": "drivers",
+							"description": "Import drivers data"
+						},
+						{
+							"linkedService": {
+								"referenceName": "answer-data-academy-WorkspaceDefaultStorage",
+								"type": "LinkedServiceReference"
+							},
+							"name": "races",
+							"description": "Add races data"
+						},
+						{
+							"linkedService": {
+								"referenceName": "answer-data-academy-WorkspaceDefaultStorage",
+								"type": "LinkedServiceReference"
+							},
+							"name": "results",
+							"description": "Import results data"
+						}
+					],
+					"sinks": [
+						{
+							"dataset": {
+								"referenceName": "AzureSqlDataset",
+								"type": "DatasetReference"
+							},
+							"name": "SinkToAzureSQLDB",
+							"rejectedDataLinkedService": {
+								"referenceName": "answer-data-academy-WorkspaceDefaultStorage",
+								"type": "LinkedServiceReference"
+							}
+						}
+					],
+					"transformations": [
+						{
+							"name": "LeftJoinRaces",
+							"description": "Left outer join 'results' and 'races'"
+						},
+						{
+							"name": "LeftJoinDrivers"
+						},
+						{
+							"name": "AddUUID"
+						},
+						{
+							"name": "ConcatdriverFullname"
+						},
+						{
+							"name": "AddYear"
+						},
+						{
+							"name": "RemoveSurplusColumns"
+						},
+						{
+							"name": "ReplaceRowsNotNull"
+						},
+						{
+							"name": "alterRowPermitAll"
+						},
+						{
+							"name": "castPointsToInt",
+							"description": "Cast Points column to type integer"
+						}
+					],
+					"scriptLines": [
+						"parameters{",
+						"     Container as string (\"synapse\"),",
+						"     Directory as string (\"alastair/f1_data\"),",
+						"     DriversFileName as string (\"drivers.csv\"),",
+						"     RaceFileName as string (\"races.csv\"),",
+						"     ResultsFileName as string (\"results.csv\")",
+						"}",
+						"source(output(",
+						"          driverId as integer,",
+						"          driverRef as string,",
+						"          number as string,",
+						"          code as string,",
+						"          forename as string,",
+						"          surname as string,",
+						"          dob as date,",
+						"          nationality as string,",
+						"          url as string",
+						"     ),",
+						"     useSchema: false,",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: false,",
+						"     format: 'delimited',",
+						"     fileSystem: ($Container),",
+						"     folderPath: ($Directory),",
+						"     fileName: ($DriversFileName),",
+						"     columnDelimiter: ',',",
+						"     escapeChar: '\\\\',",
+						"     quoteChar: '\\\"',",
+						"     columnNamesAsHeader: true) ~> drivers",
+						"source(output(",
+						"          raceId as integer,",
+						"          year as integer,",
+						"          round as integer,",
+						"          circuitId as integer,",
+						"          name as string,",
+						"          date as date 'yyyy-MM-dd',",
+						"          time as timestamp 'yyyy-MM-dd\\'T\\'HH:mm:ss.SSS\\'Z\\'',",
+						"          url as string,",
+						"          fp1_date as string,",
+						"          fp1_time as string,",
+						"          fp2_date as string,",
+						"          fp2_time as string,",
+						"          fp3_date as string,",
+						"          fp3_time as string,",
+						"          quali_date as string,",
+						"          quali_time as string,",
+						"          sprint_date as string,",
+						"          sprint_time as string",
+						"     ),",
+						"     useSchema: false,",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: false,",
+						"     format: 'delimited',",
+						"     fileSystem: ($Container),",
+						"     folderPath: ($Directory),",
+						"     fileName: ($RaceFileName),",
+						"     columnDelimiter: ',',",
+						"     escapeChar: '\\\\',",
+						"     quoteChar: '\\\"',",
+						"     columnNamesAsHeader: true) ~> races",
+						"source(output(",
+						"          resultId as integer,",
+						"          raceId as integer,",
+						"          driverId as integer,",
+						"          constructorId as integer,",
+						"          number as integer,",
+						"          grid as integer,",
+						"          position as string,",
+						"          positionText as string,",
+						"          positionOrder as integer,",
+						"          points as integer,",
+						"          laps as integer,",
+						"          time as string,",
+						"          milliseconds as string,",
+						"          fastestLap as string,",
+						"          rank as string,",
+						"          fastestLapTime as string,",
+						"          fastestLapSpeed as string,",
+						"          statusId as integer",
+						"     ),",
+						"     useSchema: false,",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: false,",
+						"     format: 'delimited',",
+						"     fileSystem: ($Container),",
+						"     folderPath: ($Directory),",
+						"     fileName: ($ResultsFileName),",
+						"     columnDelimiter: ',',",
+						"     escapeChar: '\\\\',",
+						"     quoteChar: '\\\"',",
+						"     columnNamesAsHeader: true) ~> results",
+						"results, races join(results@raceId == races@raceId,",
+						"     joinType:'left',",
+						"     matchType:'exact',",
+						"     ignoreSpaces: false,",
+						"     broadcast: 'auto')~> LeftJoinRaces",
+						"LeftJoinRaces, drivers join(results@driverId == drivers@driverId,",
+						"     joinType:'left',",
+						"     matchType:'exact',",
+						"     ignoreSpaces: false,",
+						"     broadcast: 'auto')~> LeftJoinDrivers",
+						"LeftJoinDrivers derive(Id = uuid()) ~> AddUUID",
+						"AddUUID derive(driverFullname = concat(forename, \" \", surname)) ~> ConcatdriverFullname",
+						"ConcatdriverFullname derive(year = year(date)) ~> AddYear",
+						"AddYear select(mapColumn(",
+						"          Id,",
+						"          year,",
+						"          round,",
+						"          raceName = name,",
+						"          driverFullname,",
+						"          code,",
+						"          position,",
+						"          points,",
+						"          fastestLapTime",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> RemoveSurplusColumns",
+						"alterRowPermitAll derive(fastestLapTime = case(\r",
+						"    fastestLapTime=='\\\\N', '00:00:00',\r",
+						"    fastestLapTime!='\\\\N', fastestLapTime\r",
+						"    ),",
+						"          position = case(\r",
+						"    position=='\\\\N', '0',\r",
+						"    position!='\\\\N', position\r",
+						"    )) ~> ReplaceRowsNotNull",
+						"RemoveSurplusColumns alterRow(updateIf(true())) ~> alterRowPermitAll",
+						"ReplaceRowsNotNull cast(output(",
+						"          position as integer '000'",
+						"     ),",
+						"     errors: true) ~> castPointsToInt",
+						"castPointsToInt sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     deletable:false,",
+						"     insertable:true,",
+						"     updateable:true,",
+						"     upsertable:false,",
+						"     keys:['Id'],",
+						"     format: 'table',",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     errorHandlingOption: 'stopOnFirstError') ~> SinkToAzureSQLDB"
+					]
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/linkedServices/answer-data-academy-WorkspaceDefaultStorage')]",
+				"[concat(variables('workspaceId'), '/datasets/AzureSqlDataset')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/f1dataflowyc')]",
+			"type": "Microsoft.Synapse/workspaces/dataflows",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "DataLakeTextDataset",
+								"type": "DatasetReference"
+							},
+							"name": "drivers"
+						},
+						{
+							"dataset": {
+								"referenceName": "DataLakeTextDataset",
+								"type": "DatasetReference"
+							},
+							"name": "results"
+						},
+						{
+							"dataset": {
+								"referenceName": "DataLakeTextDataset",
+								"type": "DatasetReference"
+							},
+							"name": "races"
+						}
+					],
+					"sinks": [
+						{
+							"dataset": {
+								"referenceName": "AzureSqlTable1",
+								"type": "DatasetReference"
+							},
+							"name": "SinkToSeasons",
+							"rejectedDataLinkedService": {
+								"referenceName": "answer-data-academy-WorkspaceDefaultStorage",
+								"type": "LinkedServiceReference"
+							}
+						}
+					],
+					"transformations": [
+						{
+							"name": "JoinResultsDrivers"
+						},
+						{
+							"name": "JoinAllData"
+						},
+						{
+							"name": "select",
+							"description": "Select required fields"
+						},
+						{
+							"name": "derivedColumn",
+							"description": "Create relevant columns"
+						}
+					],
+					"scriptLines": [
+						"parameters{",
+						"     Directory as string (\"yamin/f1_data\"),",
+						"     DriversFileName as string (\"drivers.csv\"),",
+						"     RacesFileName as string (\"races.csv\"),",
+						"     ResultsFilename as string (\"results.csv\"),",
+						"     Container as string (\"synapse\")",
+						"}",
+						"source(output(",
+						"          driverId as short,",
+						"          driverRef as string,",
+						"          number as string,",
+						"          code as string,",
+						"          forename as string,",
+						"          surname as string,",
+						"          dob as date,",
+						"          nationality as string,",
+						"          url as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: false) ~> drivers",
+						"source(output(",
+						"          resultId as short,",
+						"          raceId as short,",
+						"          driverId as short,",
+						"          constructorId as short,",
+						"          number as short,",
+						"          grid as short,",
+						"          position as string,",
+						"          positionText as string,",
+						"          positionOrder as short,",
+						"          points as short,",
+						"          laps as short,",
+						"          time as string,",
+						"          milliseconds as string,",
+						"          fastestLap as string,",
+						"          rank as string,",
+						"          fastestLapTime as string,",
+						"          fastestLapSpeed as string,",
+						"          statusId as short",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: false) ~> results",
+						"source(output(",
+						"          raceId as short,",
+						"          year as short,",
+						"          round as short,",
+						"          circuitId as short,",
+						"          name as string,",
+						"          date as date,",
+						"          time as string,",
+						"          url as string,",
+						"          fp1_date as string,",
+						"          fp1_time as string,",
+						"          fp2_date as string,",
+						"          fp2_time as string,",
+						"          fp3_date as string,",
+						"          fp3_time as string,",
+						"          quali_date as string,",
+						"          quali_time as string,",
+						"          sprint_date as string,",
+						"          sprint_time as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: false) ~> races",
+						"results, drivers join(results@driverId == drivers@driverId,",
+						"     joinType:'inner',",
+						"     matchType:'exact',",
+						"     ignoreSpaces: false,",
+						"     broadcast: 'auto')~> JoinResultsDrivers",
+						"JoinResultsDrivers, races join(results@raceId == races@raceId,",
+						"     joinType:'inner',",
+						"     matchType:'exact',",
+						"     ignoreSpaces: false,",
+						"     broadcast: 'auto')~> JoinAllData",
+						"derivedColumn select(mapColumn(",
+						"          Id,",
+						"          year,",
+						"          round,",
+						"          raceName = name,",
+						"          driverFullname,",
+						"          code,",
+						"          position,",
+						"          points",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> select",
+						"JoinAllData derive(Id = uuid(),",
+						"          year = year,",
+						"          round = round,",
+						"          raceName = name,",
+						"          driverFullname = concat(forename,' ', surname),",
+						"          code = code,",
+						"          position = toShort(position),",
+						"          points = points) ~> derivedColumn",
+						"select sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     input(",
+						"          Id as string,",
+						"          year as integer,",
+						"          round as integer,",
+						"          raceName as string,",
+						"          driverFullname as string,",
+						"          code as string,",
+						"          postion as integer,",
+						"          points as integer",
+						"     ),",
+						"     deletable:false,",
+						"     insertable:true,",
+						"     updateable:false,",
+						"     upsertable:false,",
+						"     format: 'table',",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     errorHandlingOption: 'stopOnFirstError') ~> SinkToSeasons"
+					]
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/datasets/DataLakeTextDataset')]",
+				"[concat(variables('workspaceId'), '/datasets/AzureSqlTable1')]",
+				"[concat(variables('workspaceId'), '/linkedServices/answer-data-academy-WorkspaceDefaultStorage')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/WorkspaceSystemIdentity')]",
+			"type": "Microsoft.Synapse/workspaces/credentials",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"type": "ManagedIdentity",
+				"typeProperties": {}
+			},
+			"dependsOn": []
+		}
+	]
+}
