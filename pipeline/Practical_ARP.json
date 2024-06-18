@@ -155,13 +155,17 @@
 								}
 							},
 							"SinkToAzureSQLDB": {
-								"DatabaseName": "DataAcademyYC"
+								"DatabaseName": "DataAcademyAP",
+								"SchemaName": "Practical",
+								"TableName": "Seasons"
 							}
 						},
 						"linkedServiceParameters": {
 							"SinkToAzureSQLDB": {
 								"schemaLinkedService": {
-									"DatabaseName": "DataAcademyYC"
+									"DatabaseName": "DataAcademyAP",
+									"SchemaName": "Practical",
+									"TableName": "Seasons"
 								}
 							}
 						}
