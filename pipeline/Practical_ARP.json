@@ -3,282 +3,6 @@
 	"properties": {
 		"activities": [
 			{
-				"name": "Log Season Insert Event",
-				"type": "Lookup",
-				"dependsOn": [
-					{
-						"activity": "Set variable Files",
-						"dependencyConditions": [
-							"Succeeded"
-						]
-					}
-				],
-				"policy": {
-					"timeout": "0.12:00:00",
-					"retry": 0,
-					"retryIntervalInSeconds": 30,
-					"secureOutput": false,
-					"secureInput": false
-				},
-				"userProperties": [],
-				"typeProperties": {
-					"source": {
-						"type": "AzureSqlSource",
-						"sqlReaderStoredProcedureName": "[Log].[Copy_SeasonInsertEvent]",
-						"storedProcedureParameters": {
-							"Container": {
-								"type": "String",
-								"value": {
-									"value": "@pipeline().parameters.Container",
-									"type": "Expression"
-								}
-							},
-							"Directory": {
-								"type": "String",
-								"value": {
-									"value": "@pipeline().parameters.Directory",
-									"type": "Expression"
-								}
-							},
-							"Files": {
-								"type": "String",
-								"value": {
-									"value": "@variables('Files')",
-									"type": "Expression"
-								}
-							}
-						},
-						"queryTimeout": "02:00:00",
-						"partitionOption": "None"
-					},
-					"dataset": {
-						"referenceName": "AzureSqlDataset",
-						"type": "DatasetReference",
-						"parameters": {
-							"DatabaseName": {
-								"value": "@pipeline().parameters.DBName",
-								"type": "Expression"
-							},
-							"SchemaName": "NULL",
-							"TableName": "NULL"
-						}
-					}
-				}
-			},
-			{
-				"name": "Data flow Season",
-				"type": "ExecuteDataFlow",
-				"dependsOn": [
-					{
-						"activity": "Log Season Insert Event",
-						"dependencyConditions": [
-							"Succeeded"
-						]
-					},
-					{
-						"activity": "IfNoRowsThenRunDataFlow",
-						"dependencyConditions": [
-							"Failed"
-						]
-					}
-				],
-				"policy": {
-					"timeout": "0.12:00:00",
-					"retry": 0,
-					"retryIntervalInSeconds": 30,
-					"secureOutput": false,
-					"secureInput": false
-				},
-				"userProperties": [],
-				"typeProperties": {
-					"dataflow": {
-						"referenceName": "ARP_Dataflow_F1",
-						"type": "DataFlowReference",
-						"parameters": {
-							"Container": "\"synapse\"",
-							"Directory": "\"alastair/f1_data\"",
-							"DriversFileName": "\"drivers.csv\"",
-							"RaceFileName": "\"races.csv\"",
-							"ResultsFileName": "\"results.csv\""
-						},
-						"datasetParameters": {
-							"SinkToAzureSQLDB": {
-								"DatabaseName": "DataAcademyAP",
-								"SchemaName": "Practical",
-								"TableName": "Seasons"
-							}
-						}
-					},
-					"compute": {
-						"coreCount": 8,
-						"computeType": "General"
-					},
-					"traceLevel": "Fine"
-				}
-			},
-			{
-				"name": "Stored procedure Remove Year",
-				"type": "SqlServerStoredProcedure",
-				"dependsOn": [
-					{
-						"activity": "Set variable Year",
-						"dependencyConditions": [
-							"Succeeded"
-						]
-					}
-				],
-				"policy": {
-					"timeout": "0.12:00:00",
-					"retry": 0,
-					"retryIntervalInSeconds": 30,
-					"secureOutput": false,
-					"secureInput": false
-				},
-				"userProperties": [],
-				"typeProperties": {
-					"storedProcedureName": "[Practical].[Remove_Year]",
-					"storedProcedureParameters": {
-						"Year": {
-							"value": {
-								"value": "@variables('Year')",
-								"type": "Expression"
-							},
-							"type": "Int64"
-						}
-					}
-				},
-				"linkedServiceName": {
-					"referenceName": "AzureSqlDatabase",
-					"type": "LinkedServiceReference",
-					"parameters": {
-						"DatabaseName": {
-							"value": "@pipeline().parameters.DBName",
-							"type": "Expression"
-						}
-					}
-				}
-			},
-			{
-				"name": "Set variable Files",
-				"type": "SetVariable",
-				"dependsOn": [],
-				"policy": {
-					"secureOutput": false,
-					"secureInput": false
-				},
-				"userProperties": [],
-				"typeProperties": {
-					"variableName": "Files",
-					"value": {
-						"value": "@concat(pipeline().parameters.DriversFileName, ' ', pipeline().parameters.RacesFileName, ' ', pipeline().parameters.ResultsFileName)",
-						"type": "Expression"
-					}
-				}
-			},
-			{
-				"name": "Log Season Update Event Success",
-				"type": "SqlServerStoredProcedure",
-				"dependsOn": [
-					{
-						"activity": "Data flow Season",
-						"dependencyConditions": [
-							"Succeeded"
-						]
-					}
-				],
-				"policy": {
-					"timeout": "0.12:00:00",
-					"retry": 0,
-					"retryIntervalInSeconds": 30,
-					"secureOutput": false,
-					"secureInput": false
-				},
-				"userProperties": [],
-				"typeProperties": {
-					"storedProcedureName": "[Log].[Season_UpdateEvent]",
-					"storedProcedureParameters": {
-						"Status": {
-							"value": "\"Succeeded\"",
-							"type": "String"
-						},
-						"ErrorMessage": {
-							"value": null,
-							"type": "String"
-						},
-						"Season_EventId": {
-							"value": {
-								"value": "@activity('Log Season Insert Event').output.firstRow.Season_EventId",
-								"type": "Expression"
-							},
-							"type": "Guid"
-						}
-					}
-				},
-				"linkedServiceName": {
-					"referenceName": "AzureSqlDatabase",
-					"type": "LinkedServiceReference",
-					"parameters": {
-						"DatabaseName": {
-							"value": "@pipeline().parameters.DBName",
-							"type": "Expression"
-						}
-					}
-				}
-			},
-			{
-				"name": "Log Season Update Event Failure",
-				"type": "SqlServerStoredProcedure",
-				"dependsOn": [
-					{
-						"activity": "Data flow Season",
-						"dependencyConditions": [
-							"Failed"
-						]
-					}
-				],
-				"policy": {
-					"timeout": "0.12:00:00",
-					"retry": 0,
-					"retryIntervalInSeconds": 30,
-					"secureOutput": false,
-					"secureInput": false
-				},
-				"userProperties": [],
-				"typeProperties": {
-					"storedProcedureName": "[Log].[Season_UpdateEvent]",
-					"storedProcedureParameters": {
-						"Status": {
-							"value": "\"Failed\"",
-							"type": "String"
-						},
-						"EndDateTime": {
-							"value": {
-								"value": "getdate()",
-								"type": "Expression"
-							},
-							"type": "Datetime"
-						},
-						"ErrorMessage": {
-							"value": {
-								"value": "@activity('Data flow Season').output.errors[0].Message",
-								"type": "Expression"
-							},
-							"type": "String"
-						}
-					}
-				},
-				"linkedServiceName": {
-					"referenceName": "AzureSqlDatabase",
-					"type": "LinkedServiceReference",
-					"parameters": {
-						"DatabaseName": {
-							"value": "@pipeline().parameters.DBName",
-							"type": "Expression"
-						}
-					}
-				}
-			},
-			{
 				"name": "Set variable Year",
 				"type": "SetVariable",
 				"dependsOn": [],
@@ -297,23 +21,253 @@
 				"type": "IfCondition",
 				"dependsOn": [
 					{
-						"activity": "Stored procedure Check Year",
+						"activity": "Lookup_rows_for_year",
 						"dependencyConditions": [
-							"Succeeded"
+							"Completed"
 						]
 					}
 				],
 				"userProperties": [],
 				"typeProperties": {
 					"expression": {
-						"value": "@activity('Stored procedure Check Year').output",
+						"value": "@bool(activity('Lookup_rows_for_year').output.value[0])",
 						"type": "Expression"
-					}
+					},
+					"ifTrueActivities": [
+						{
+							"name": "Log Season Insert Event",
+							"type": "Lookup",
+							"dependsOn": [
+								{
+									"activity": "Set variable Files",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderStoredProcedureName": "[Log].[Copy_SeasonInsertEvent]",
+									"storedProcedureParameters": {
+										"Container": {
+											"type": "String",
+											"value": {
+												"value": "@pipeline().parameters.Container",
+												"type": "Expression"
+											}
+										},
+										"Directory": {
+											"type": "String",
+											"value": {
+												"value": "@pipeline().parameters.Directory",
+												"type": "Expression"
+											}
+										},
+										"Files": {
+											"type": "String",
+											"value": {
+												"value": "@variables('Files')",
+												"type": "Expression"
+											}
+										}
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "AzureSqlDataset",
+									"type": "DatasetReference",
+									"parameters": {
+										"DatabaseName": {
+											"value": "@pipeline().parameters.DBName",
+											"type": "Expression"
+										},
+										"SchemaName": "NULL",
+										"TableName": "NULL"
+									}
+								}
+							}
+						},
+						{
+							"name": "Data flow Season",
+							"type": "ExecuteDataFlow",
+							"dependsOn": [
+								{
+									"activity": "Log Season Insert Event",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataflow": {
+									"referenceName": "ARP_Dataflow_F1",
+									"type": "DataFlowReference",
+									"parameters": {
+										"Container": "\"synapse\"",
+										"Directory": "\"alastair/f1_data\"",
+										"DriversFileName": "\"drivers.csv\"",
+										"RaceFileName": "\"races.csv\"",
+										"ResultsFileName": "\"results.csv\""
+									},
+									"datasetParameters": {
+										"SinkToAzureSQLDB": {
+											"DatabaseName": "DataAcademyAP",
+											"SchemaName": "Practical",
+											"TableName": "Seasons"
+										}
+									}
+								},
+								"compute": {
+									"coreCount": 8,
+									"computeType": "General"
+								},
+								"traceLevel": "Fine"
+							}
+						},
+						{
+							"name": "Set variable Files",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "Files",
+								"value": {
+									"value": "@concat(pipeline().parameters.DriversFileName, ' ', pipeline().parameters.RacesFileName, ' ', pipeline().parameters.ResultsFileName)",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Log Season Update Event Success",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Data flow Season",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[Log].[Season_UpdateEvent]",
+								"storedProcedureParameters": {
+									"Status": {
+										"value": "\"Succeeded\"",
+										"type": "String"
+									},
+									"ErrorMessage": {
+										"value": null,
+										"type": "String"
+									},
+									"Season_EventId": {
+										"value": {
+											"value": "@activity('Log Season Insert Event').output.firstRow.Season_EventId",
+											"type": "Expression"
+										},
+										"type": "Guid"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "AzureSqlDatabase",
+								"type": "LinkedServiceReference",
+								"parameters": {
+									"DatabaseName": {
+										"value": "@pipeline().parameters.DBName",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "Log Season Update Event Failure",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Data flow Season",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[Log].[Season_UpdateEvent]",
+								"storedProcedureParameters": {
+									"Status": {
+										"value": "\"Failed\"",
+										"type": "String"
+									},
+									"EndDateTime": {
+										"value": {
+											"value": "getdate()",
+											"type": "Expression"
+										},
+										"type": "Datetime"
+									},
+									"ErrorMessage": {
+										"value": {
+											"value": "@activity('Data flow Season').output.errors[0].Message",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "AzureSqlDatabase",
+								"type": "LinkedServiceReference",
+								"parameters": {
+									"DatabaseName": {
+										"value": "@pipeline().parameters.DBName",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
 				}
 			},
 			{
-				"name": "Stored procedure Check Year",
-				"type": "SqlServerStoredProcedure",
+				"name": "Lookup_rows_for_year",
+				"type": "Lookup",
 				"dependsOn": [
 					{
 						"activity": "Set variable Year",
@@ -331,26 +285,34 @@
 				},
 				"userProperties": [],
 				"typeProperties": {
-					"storedProcedureName": "[Practical].[Check_Year]",
-					"storedProcedureParameters": {
-						"Year": {
-							"value": {
-								"value": "@variables('Year')",
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "SELECT COUNT(*) AS yearRowCount FROM [@{pipeline().parameters.DBSchema}].[@{pipeline().parameters.DBTable}] WHERE 'Year'='@{variables('Year')}';",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "AzureSqlDataset",
+						"type": "DatasetReference",
+						"parameters": {
+							"DatabaseName": {
+								"value": "@pipeline().parameters.DBName",
 								"type": "Expression"
 							},
-							"type": "Int64"
+							"SchemaName": {
+								"value": "@pipeline().parameters.DBSchema",
+								"type": "Expression"
+							},
+							"TableName": {
+								"value": "@pipeline().parameters.DBTable",
+								"type": "Expression"
+							}
 						}
-					}
-				},
-				"linkedServiceName": {
-					"referenceName": "AzureSqlDatabase",
-					"type": "LinkedServiceReference",
-					"parameters": {
-						"DatabaseName": {
-							"value": "@pipeline().parameters.DBName",
-							"type": "Expression"
-						}
-					}
+					},
+					"firstRowOnly": false
 				}
 			}
 		],
