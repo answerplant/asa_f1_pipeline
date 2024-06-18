@@ -102,6 +102,48 @@
 							"ResultsFileName": "\"results.csv\""
 						},
 						"datasetParameters": {
+							"drivers": {
+								"Container": {
+									"value": "@pipeline().parameters.Container",
+									"type": "Expression"
+								},
+								"Directory": {
+									"value": "@pipeline().parameters.Directory",
+									"type": "Expression"
+								},
+								"FileName": {
+									"value": "@pipeline().parameters.DriversFileName",
+									"type": "Expression"
+								}
+							},
+							"races": {
+								"Container": {
+									"value": "@pipeline().parameters.Container",
+									"type": "Expression"
+								},
+								"Directory": {
+									"value": "@pipeline().parameters.Directory",
+									"type": "Expression"
+								},
+								"FileName": {
+									"value": "@pipeline().parameters.RacesFileName",
+									"type": "Expression"
+								}
+							},
+							"results": {
+								"Container": {
+									"value": "@pipeline().parameters.Container",
+									"type": "Expression"
+								},
+								"Directory": {
+									"value": "@pipeline().parameters.Directory",
+									"type": "Expression"
+								},
+								"FileName": {
+									"value": "@pipeline().parameters.ResultsFileName",
+									"type": "Expression"
+								}
+							},
 							"SinkToAzureSQLDB": {
 								"DatabaseName": "DataAcademyAP",
 								"SchemaName": "Practical",
