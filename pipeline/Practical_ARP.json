@@ -151,17 +151,35 @@
 								}
 							},
 							"SinkToAzureSQLDB": {
-								"DatabaseName": "DataAcademyAP",
-								"SchemaName": "Practical",
-								"TableName": "Seasons"
+								"DatabaseName": {
+									"value": "@pipeline().parameters.DBName",
+									"type": "Expression"
+								},
+								"SchemaName": {
+									"value": "@pipeline().parameters.DBSchema",
+									"type": "Expression"
+								},
+								"TableName": {
+									"value": "@pipeline().parameters.DBTable",
+									"type": "Expression"
+								}
 							}
 						},
 						"linkedServiceParameters": {
 							"SinkToAzureSQLDB": {
 								"schemaLinkedService": {
-									"DatabaseName": "DataAcademyAP",
-									"SchemaName": "Practical",
-									"TableName": "Seasons"
+									"DatabaseName": {
+										"value": "@pipeline().parameters.DBName",
+										"type": "Expression"
+									},
+									"SchemaName": {
+										"value": "@pipeline().parameters.DBSchema",
+										"type": "Expression"
+									},
+									"TableName": {
+										"value": "@pipeline().parameters.DBTable",
+										"type": "Expression"
+									}
 								}
 							}
 						}
