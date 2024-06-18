@@ -157,10 +157,7 @@
 						"linkedServiceParameters": {
 							"SinkToAzureSQLDB": {
 								"schemaLinkedService": {
-									"DatabaseName": {
-										"value": "@pipeline().parameters.DBName",
-										"type": "Expression"
-									}
+									"DatabaseName": "DataAcademyYC"
 								}
 							}
 						}
