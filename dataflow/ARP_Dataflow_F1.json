@@ -61,6 +61,10 @@
 				},
 				{
 					"name": "RemoveSurplusColumns"
+				},
+				{
+					"name": "castPositionInteger",
+					"description": "Cast position to integer"
 				}
 			],
 			"scriptLines": [
@@ -158,7 +162,11 @@
 				"     ),",
 				"     skipDuplicateMapInputs: true,",
 				"     skipDuplicateMapOutputs: true) ~> RemoveSurplusColumns",
-				"RemoveSurplusColumns sink(allowSchemaDrift: true,",
+				"RemoveSurplusColumns cast(output(",
+				"          position as integer",
+				"     ),",
+				"     errors: true) ~> castPositionInteger",
+				"castPositionInteger sink(allowSchemaDrift: true,",
 				"     validateSchema: false,",
 				"     input(",
 				"          Id as string,",
