@@ -65,6 +65,9 @@
 				{
 					"name": "castPositionInteger",
 					"description": "Cast position to integer"
+				},
+				{
+					"name": "derivedColumnReplaceEndlines"
 				}
 			],
 			"scriptLines": [
@@ -162,10 +165,18 @@
 				"     ),",
 				"     skipDuplicateMapInputs: true,",
 				"     skipDuplicateMapOutputs: true) ~> RemoveSurplusColumns",
-				"RemoveSurplusColumns cast(output(",
+				"derivedColumnReplaceEndlines cast(output(",
 				"          position as integer",
 				"     ),",
 				"     errors: true) ~> castPositionInteger",
+				"RemoveSurplusColumns derive(fastestLapTime = case(\r",
+				"    fastestLapTime=='\\\\N', '00:00:00',\r",
+				"    fastestLapTime!='\\\\N', fastestLapTime\r",
+				"    ),",
+				"          position = case(\r",
+				"    position=='\\\\N', '0',\r",
+				"    position!='\\\\N', position\r",
+				"    )) ~> derivedColumnReplaceEndlines",
 				"castPositionInteger sink(allowSchemaDrift: true,",
 				"     validateSchema: false,",
 				"     input(",
