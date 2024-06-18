@@ -61,16 +61,6 @@
 				},
 				{
 					"name": "RemoveSurplusColumns"
-				},
-				{
-					"name": "ReplaceRowsNotNull"
-				},
-				{
-					"name": "alterRowPermitAll"
-				},
-				{
-					"name": "castPointsToInt",
-					"description": "Cast Points column to type integer"
 				}
 			],
 			"scriptLines": [
@@ -80,7 +70,7 @@
 				"     DriversFileName as string (\"drivers.csv\"),",
 				"     RaceFileName as string (\"races.csv\"),",
 				"     ResultsFileName as string (\"results.csv\"),",
-				"     DBName as string",
+				"     DBName as string (\"DataAcademyAP\")",
 				"}",
 				"source(output(",
 				"          driverId as short,",
@@ -168,21 +158,7 @@
 				"     ),",
 				"     skipDuplicateMapInputs: true,",
 				"     skipDuplicateMapOutputs: true) ~> RemoveSurplusColumns",
-				"alterRowPermitAll derive(fastestLapTime = case(\r",
-				"    fastestLapTime=='\\\\N', '00:00:00',\r",
-				"    fastestLapTime!='\\\\N', fastestLapTime\r",
-				"    ),",
-				"          position = case(\r",
-				"    position=='\\\\N', '0',\r",
-				"    position!='\\\\N', position\r",
-				"    )) ~> ReplaceRowsNotNull",
-				"RemoveSurplusColumns alterRow(updateIf(true()),",
-				"     insertIf(true())) ~> alterRowPermitAll",
-				"ReplaceRowsNotNull cast(output(",
-				"          position as integer '000'",
-				"     ),",
-				"     errors: true) ~> castPointsToInt",
-				"castPointsToInt sink(allowSchemaDrift: true,",
+				"RemoveSurplusColumns sink(allowSchemaDrift: true,",
 				"     validateSchema: false,",
 				"     input(",
 				"          Id as string,",
@@ -209,8 +185,9 @@
 				"          raceName,",
 				"          driverFullname,",
 				"          code,",
-				"          postion = position,",
-				"          points",
+				"          position,",
+				"          points,",
+				"          fastestLaptime = fastestLapTime",
 				"     )) ~> SinkToAzureSQLDB"
 			]
 		}
