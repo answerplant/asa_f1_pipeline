@@ -159,15 +159,6 @@
 								"SchemaName": "Practical",
 								"TableName": "Seasons"
 							}
-						},
-						"linkedServiceParameters": {
-							"SinkToAzureSQLDB": {
-								"schemaLinkedService": {
-									"DatabaseName": "DataAcademyAP",
-									"SchemaName": "Practical",
-									"TableName": "Seasons"
-								}
-							}
 						}
 					},
 					"compute": {
