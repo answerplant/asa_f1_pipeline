@@ -182,7 +182,7 @@
 				"     ),",
 				"     errors: true) ~> castPointsToInt",
 				"castPointsToInt sink(allowSchemaDrift: true,",
-				"     validateSchema: true,",
+				"     validateSchema: false,",
 				"     input(",
 				"          Id as string,",
 				"          year as integer,",
@@ -196,22 +196,12 @@
 				"     ),",
 				"     deletable:false,",
 				"     insertable:true,",
-				"     updateable:true,",
+				"     updateable:false,",
 				"     upsertable:false,",
-				"     keys:['Id'],",
 				"     format: 'table',",
-				"     errorHandlingOption: 'stopOnFirstError',",
-				"     mapColumn(",
-				"          Id,",
-				"          year,",
-				"          round,",
-				"          raceName,",
-				"          driverFullname,",
-				"          code,",
-				"          position,",
-				"          points,",
-				"          fastestLapTime",
-				"     )) ~> SinkToAzureSQLDB"
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError') ~> SinkToAzureSQLDB"
 			]
 		}
 	}
