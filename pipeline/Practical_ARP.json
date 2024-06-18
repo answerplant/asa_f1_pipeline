@@ -56,7 +56,7 @@
 							"typeProperties": {
 								"source": {
 									"type": "AzureSqlSource",
-									"sqlReaderStoredProcedureName": "[Log].[Copy_SeasonInsertEvent]",
+									"sqlReaderStoredProcedureName": "[Log].[Season_InsertEvent]",
 									"storedProcedureParameters": {
 										"Container": {
 											"type": "String",
