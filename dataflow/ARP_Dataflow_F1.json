@@ -189,8 +189,6 @@
 				"     upsertable:false,",
 				"     keys:['Id'],",
 				"     format: 'table',",
-				"     skipDuplicateMapInputs: true,",
-				"     skipDuplicateMapOutputs: true,",
 				"     errorHandlingOption: 'stopOnFirstError',",
 				"     mapColumn(",
 				"          Id,",
