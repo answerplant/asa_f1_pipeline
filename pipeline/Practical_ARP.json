@@ -105,7 +105,11 @@
 							"Directory": "\"alastair/f1_data\"",
 							"DriversFileName": "\"drivers.csv\"",
 							"RaceFileName": "\"races.csv\"",
-							"ResultsFileName": "\"results.csv\""
+							"ResultsFileName": "\"results.csv\"",
+							"DBName": {
+								"value": "'@{pipeline().parameters.DBName}'",
+								"type": "Expression"
+							}
 						},
 						"datasetParameters": {
 							"drivers": {
@@ -151,13 +155,9 @@
 								}
 							},
 							"SinkToAzureSQLDB": {
-								"DatabaseName": "DataAcademyYC"
-							}
-						},
-						"linkedServiceParameters": {
-							"SinkToAzureSQLDB": {
-								"schemaLinkedService": {
-									"DatabaseName": "DataAcademyYC"
+								"DatabaseName": {
+									"value": "@pipeline().parameters.DBName",
+									"type": "Expression"
 								}
 							}
 						}
