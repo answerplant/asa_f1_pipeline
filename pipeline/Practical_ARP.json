@@ -151,18 +151,7 @@
 								}
 							},
 							"SinkToAzureSQLDB": {
-								"DatabaseName": {
-									"value": "@pipeline().parameters.DBName",
-									"type": "Expression"
-								},
-								"SchemaName": {
-									"value": "@pipeline().parameters.DBSchema",
-									"type": "Expression"
-								},
-								"TableName": {
-									"value": "@pipeline().parameters.DBTable",
-									"type": "Expression"
-								}
+								"DatabaseName": "DataAcademyYC"
 							}
 						},
 						"linkedServiceParameters": {
@@ -170,14 +159,6 @@
 								"schemaLinkedService": {
 									"DatabaseName": {
 										"value": "@pipeline().parameters.DBName",
-										"type": "Expression"
-									},
-									"SchemaName": {
-										"value": "@pipeline().parameters.DBSchema",
-										"type": "Expression"
-									},
-									"TableName": {
-										"value": "@pipeline().parameters.DBTable",
 										"type": "Expression"
 									}
 								}
@@ -412,7 +393,8 @@
 				"defaultValue": "\"@{pipeline().parameters.DriversFileName},@{pipeline().parameters.RacesFileName},@{pipeline().parameters.ResultsFileName}\""
 			},
 			"Year": {
-				"type": "Integer"
+				"type": "Integer",
+				"defaultValue": 2000
 			}
 		},
 		"folder": {
