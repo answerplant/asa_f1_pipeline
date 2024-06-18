@@ -80,7 +80,7 @@
 				"     DriversFileName as string (\"drivers.csv\"),",
 				"     RaceFileName as string (\"races.csv\"),",
 				"     ResultsFileName as string (\"results.csv\"),",
-				"     DBName as string (\"AzureSqlTableAP\")",
+				"     DBName as string",
 				"}",
 				"source(output(",
 				"          driverId as short,",
