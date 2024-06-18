@@ -208,7 +208,7 @@
 				"     ),",
 				"     errors: true) ~> castPointsToInt",
 				"castPointsToInt sink(allowSchemaDrift: true,",
-				"     validateSchema: false,",
+				"     validateSchema: true,",
 				"     deletable:false,",
 				"     insertable:true,",
 				"     updateable:true,",
