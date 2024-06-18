@@ -201,7 +201,17 @@
 				"     format: 'table',",
 				"     skipDuplicateMapInputs: true,",
 				"     skipDuplicateMapOutputs: true,",
-				"     errorHandlingOption: 'stopOnFirstError') ~> SinkToAzureSQLDB"
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          Id,",
+				"          year,",
+				"          round,",
+				"          raceName,",
+				"          driverFullname,",
+				"          code,",
+				"          postion = position,",
+				"          points",
+				"     )) ~> SinkToAzureSQLDB"
 			]
 		}
 	}
