@@ -32,7 +32,7 @@
 			"sinks": [
 				{
 					"dataset": {
-						"referenceName": "AzureSqlDataset",
+						"referenceName": "AzureSqlTable1",
 						"type": "DatasetReference"
 					},
 					"name": "SinkToAzureSQLDB",
@@ -190,9 +190,8 @@
 				"          raceName as string,",
 				"          driverFullname as string,",
 				"          code as string,",
-				"          position as integer,",
-				"          points as integer,",
-				"          fastestLaptime as string",
+				"          postion as integer,",
+				"          points as integer",
 				"     ),",
 				"     deletable:false,",
 				"     insertable:true,",
