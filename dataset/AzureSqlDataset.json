@@ -30,7 +30,48 @@
 		},
 		"annotations": [],
 		"type": "AzureSqlTable",
-		"schema": [],
+		"schema": [
+			{
+				"name": "Id",
+				"type": "uniqueidentifier"
+			},
+			{
+				"name": "year",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "round",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "raceName",
+				"type": "varchar"
+			},
+			{
+				"name": "driverFullname",
+				"type": "varchar"
+			},
+			{
+				"name": "code",
+				"type": "varchar"
+			},
+			{
+				"name": "position",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "points",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "fastestLaptime",
+				"type": "varchar"
+			}
+		],
 		"typeProperties": {
 			"schema": {
 				"value": "@dataset().SchemaName",
