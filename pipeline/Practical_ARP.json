@@ -30,7 +30,7 @@
 				"userProperties": [],
 				"typeProperties": {
 					"expression": {
-						"value": "@bool(activity('Lookup_rows_for_year').output.value[0])",
+						"value": "@bool(activity('Lookup_rows_for_year').output.count)",
 						"type": "Expression"
 					},
 					"ifTrueActivities": [
@@ -288,7 +288,7 @@
 					"source": {
 						"type": "AzureSqlSource",
 						"sqlReaderQuery": {
-							"value": "SELECT COUNT(*) AS yearRowCount FROM [@{pipeline().parameters.DBSchema}].[@{pipeline().parameters.DBTable}] WHERE 'Year'='@{variables('Year')}';",
+							"value": "SELECT * FROM [@{pipeline().parameters.DBSchema}].[@{pipeline().parameters.DBTable}] WHERE 'year'='@{variables('Year')}';",
 							"type": "Expression"
 						},
 						"queryTimeout": "02:00:00",
