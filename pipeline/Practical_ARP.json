@@ -110,7 +110,7 @@
 								"value": "'@{pipeline().parameters.DBName}'",
 								"type": "Expression"
 							},
-							"FIlterYear": {
+							"FilterYear": {
 								"value": "'@{variables('Year')}'",
 								"type": "Expression"
 							}
@@ -345,7 +345,7 @@
 				"userProperties": [],
 				"typeProperties": {
 					"variableName": "Year",
-					"value": 2000
+					"value": 2008
 				}
 			}
 		],
