@@ -68,6 +68,9 @@
 				},
 				{
 					"name": "derivedColumnReplaceEndlines"
+				},
+				{
+					"name": "filter1"
 				}
 			],
 			"scriptLines": [
@@ -149,7 +152,7 @@
 				"     matchType:'exact',",
 				"     ignoreSpaces: false,",
 				"     broadcast: 'auto')~> LeftJoinDrivers",
-				"LeftJoinDrivers derive(Id = uuid()) ~> AddUUID",
+				"filter1 derive(Id = uuid()) ~> AddUUID",
 				"AddUUID derive(driverFullname = concat(forename, \" \", surname)) ~> ConcatdriverFullname",
 				"ConcatdriverFullname derive(year = year(date)) ~> AddYear",
 				"AddYear select(mapColumn(",
@@ -177,6 +180,7 @@
 				"    position=='\\\\N', '0',\r",
 				"    position!='\\\\N', position\r",
 				"    )) ~> derivedColumnReplaceEndlines",
+				"LeftJoinDrivers filter(ERROR_FUNCTION('')) ~> filter1",
 				"castPositionInteger sink(allowSchemaDrift: true,",
 				"     validateSchema: false,",
 				"     input(",
