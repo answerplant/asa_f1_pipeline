@@ -66,113 +66,6 @@
 				}
 			},
 			{
-				"name": "Data flow Season",
-				"type": "ExecuteDataFlow",
-				"dependsOn": [
-					{
-						"activity": "Stored procedure Remove Year",
-						"dependencyConditions": [
-							"Succeeded"
-						]
-					},
-					{
-						"activity": "Log Season Insert Event",
-						"dependencyConditions": [
-							"Succeeded"
-						]
-					},
-					{
-						"activity": "Set variable Year",
-						"dependencyConditions": [
-							"Succeeded"
-						]
-					}
-				],
-				"policy": {
-					"timeout": "0.12:00:00",
-					"retry": 0,
-					"retryIntervalInSeconds": 30,
-					"secureOutput": false,
-					"secureInput": false
-				},
-				"userProperties": [],
-				"typeProperties": {
-					"dataflow": {
-						"referenceName": "ARP_Dataflow_F1",
-						"type": "DataFlowReference",
-						"parameters": {
-							"Container": "\"synapse\"",
-							"Directory": "\"alastair/f1_data\"",
-							"DriversFileName": "\"drivers.csv\"",
-							"RaceFileName": "\"races.csv\"",
-							"ResultsFileName": "\"results.csv\"",
-							"DBName": {
-								"value": "'@{pipeline().parameters.DBName}'",
-								"type": "Expression"
-							},
-							"FilterYear": {
-								"value": "'@{variables('Year')}'",
-								"type": "Expression"
-							}
-						},
-						"datasetParameters": {
-							"drivers": {
-								"Container": {
-									"value": "@pipeline().parameters.Container",
-									"type": "Expression"
-								},
-								"Directory": {
-									"value": "@pipeline().parameters.Directory",
-									"type": "Expression"
-								},
-								"FileName": {
-									"value": "@pipeline().parameters.DriversFileName",
-									"type": "Expression"
-								}
-							},
-							"races": {
-								"Container": {
-									"value": "@pipeline().parameters.Container",
-									"type": "Expression"
-								},
-								"Directory": {
-									"value": "@pipeline().parameters.Directory",
-									"type": "Expression"
-								},
-								"FileName": {
-									"value": "@pipeline().parameters.RacesFileName",
-									"type": "Expression"
-								}
-							},
-							"results": {
-								"Container": {
-									"value": "@pipeline().parameters.Container",
-									"type": "Expression"
-								},
-								"Directory": {
-									"value": "@pipeline().parameters.Directory",
-									"type": "Expression"
-								},
-								"FileName": {
-									"value": "@pipeline().parameters.ResultsFileName",
-									"type": "Expression"
-								}
-							},
-							"SinkToAzureSQLDB": {
-								"DatabaseName": "DataAcademyAP",
-								"SchemaName": "Practical",
-								"TableName": "Seasons"
-							}
-						}
-					},
-					"compute": {
-						"coreCount": 8,
-						"computeType": "General"
-					},
-					"traceLevel": "Fine"
-				}
-			},
-			{
 				"name": "Stored procedure Remove Year",
 				"type": "SqlServerStoredProcedure",
 				"dependsOn": [
@@ -346,6 +239,163 @@
 				"typeProperties": {
 					"variableName": "Year",
 					"value": 2008
+				}
+			},
+			{
+				"name": "LookupRowsForYear",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "SELECT * FROM [@{pipeline().parameters.DBSchema}].[@{pipeline().parameters.DBTable}] WHERE 'year'='@{variables('Year')}';",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "AzureSqlDataset",
+						"type": "DatasetReference",
+						"parameters": {
+							"DatabaseName": {
+								"value": "@pipeline().parameters.DBName",
+								"type": "Expression"
+							},
+							"SchemaName": {
+								"value": "@pipeline().parameters.DBSchema",
+								"type": "Expression"
+							},
+							"TableName": {
+								"value": "@pipeline().parameters.DBTable",
+								"type": "Expression"
+							}
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "If RowsMissingRunDataFlow",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "LookupRowsForYear",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": []
+			},
+			{
+				"name": "Data flow Season",
+				"type": "ExecuteDataFlow",
+				"dependsOn": [
+					{
+						"activity": "Stored procedure Remove Year",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Log Season Insert Event",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataflow": {
+						"referenceName": "ARP_Dataflow_F1",
+						"type": "DataFlowReference",
+						"parameters": {
+							"Container": "\"synapse\"",
+							"Directory": "\"alastair/f1_data\"",
+							"DriversFileName": "\"drivers.csv\"",
+							"RaceFileName": "\"races.csv\"",
+							"ResultsFileName": "\"results.csv\"",
+							"DBName": {
+								"value": "'@{pipeline().parameters.DBName}'",
+								"type": "Expression"
+							},
+							"FilterYear": {
+								"value": "'@{variables('Year')}'",
+								"type": "Expression"
+							}
+						},
+						"datasetParameters": {
+							"drivers": {
+								"Container": {
+									"value": "@pipeline().parameters.Container",
+									"type": "Expression"
+								},
+								"Directory": {
+									"value": "@pipeline().parameters.Directory",
+									"type": "Expression"
+								},
+								"FileName": {
+									"value": "@pipeline().parameters.DriversFileName",
+									"type": "Expression"
+								}
+							},
+							"races": {
+								"Container": {
+									"value": "@pipeline().parameters.Container",
+									"type": "Expression"
+								},
+								"Directory": {
+									"value": "@pipeline().parameters.Directory",
+									"type": "Expression"
+								},
+								"FileName": {
+									"value": "@pipeline().parameters.RacesFileName",
+									"type": "Expression"
+								}
+							},
+							"results": {
+								"Container": {
+									"value": "@pipeline().parameters.Container",
+									"type": "Expression"
+								},
+								"Directory": {
+									"value": "@pipeline().parameters.Directory",
+									"type": "Expression"
+								},
+								"FileName": {
+									"value": "@pipeline().parameters.ResultsFileName",
+									"type": "Expression"
+								}
+							},
+							"SinkToAzureSQLDB": {
+								"DatabaseName": "DataAcademyAP",
+								"SchemaName": "Practical",
+								"TableName": "Seasons"
+							}
+						}
+					},
+					"compute": {
+						"coreCount": 8,
+						"computeType": "General"
+					},
+					"traceLevel": "Fine"
 				}
 			}
 		],
