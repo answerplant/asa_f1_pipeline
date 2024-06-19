@@ -70,7 +70,7 @@
 					"name": "derivedColumnReplaceEndlines"
 				},
 				{
-					"name": "filter1"
+					"name": "filterByYear"
 				}
 			],
 			"scriptLines": [
@@ -80,7 +80,8 @@
 				"     DriversFileName as string (\"drivers.csv\"),",
 				"     RaceFileName as string (\"races.csv\"),",
 				"     ResultsFileName as string (\"results.csv\"),",
-				"     DBName as string (\"DataAcademyAP\")",
+				"     DBName as string (\"DataAcademyAP\"),",
+				"     FIlterYear as string",
 				"}",
 				"source(output(",
 				"          driverId as short,",
@@ -152,7 +153,7 @@
 				"     matchType:'exact',",
 				"     ignoreSpaces: false,",
 				"     broadcast: 'auto')~> LeftJoinDrivers",
-				"filter1 derive(Id = uuid()) ~> AddUUID",
+				"filterByYear derive(Id = uuid()) ~> AddUUID",
 				"AddUUID derive(driverFullname = concat(forename, \" \", surname)) ~> ConcatdriverFullname",
 				"ConcatdriverFullname derive(year = year(date)) ~> AddYear",
 				"AddYear select(mapColumn(",
@@ -180,7 +181,7 @@
 				"    position=='\\\\N', '0',\r",
 				"    position!='\\\\N', position\r",
 				"    )) ~> derivedColumnReplaceEndlines",
-				"LeftJoinDrivers filter(ERROR_FUNCTION('')) ~> filter1",
+				"LeftJoinDrivers filter(year == 2008) ~> filterByYear",
 				"castPositionInteger sink(allowSchemaDrift: true,",
 				"     validateSchema: false,",
 				"     input(",

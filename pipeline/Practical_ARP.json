@@ -109,6 +109,10 @@
 							"DBName": {
 								"value": "'@{pipeline().parameters.DBName}'",
 								"type": "Expression"
+							},
+							"FIlterYear": {
+								"value": "'@{variables('Year')}'",
+								"type": "Expression"
 							}
 						},
 						"datasetParameters": {
