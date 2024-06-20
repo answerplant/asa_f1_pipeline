@@ -32,124 +32,6 @@
 			"properties": {
 				"activities": [
 					{
-						"name": "Log Season Insert Event",
-						"type": "Lookup",
-						"dependsOn": [
-							{
-								"activity": "Set variable Files",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"sqlReaderStoredProcedureName": "[Log].[Copy_SeasonInsertEvent]",
-								"storedProcedureParameters": {
-									"Container": {
-										"type": "String",
-										"value": {
-											"value": "@pipeline().parameters.Container",
-											"type": "Expression"
-										}
-									},
-									"Directory": {
-										"type": "String",
-										"value": {
-											"value": "@pipeline().parameters.Directory",
-											"type": "Expression"
-										}
-									},
-									"Files": {
-										"type": "String",
-										"value": {
-											"value": "@variables('Files')",
-											"type": "Expression"
-										}
-									}
-								},
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"dataset": {
-								"referenceName": "AzureSqlDataset",
-								"type": "DatasetReference",
-								"parameters": {
-									"DatabaseName": {
-										"value": "@pipeline().parameters.DBName",
-										"type": "Expression"
-									},
-									"SchemaName": "NULL",
-									"TableName": "NULL"
-								}
-							}
-						}
-					},
-					{
-						"name": "Data flow Season",
-						"type": "ExecuteDataFlow",
-						"dependsOn": [
-							{
-								"activity": "Stored procedure Remove Year",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							},
-							{
-								"activity": "Log Season Insert Event",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"dataflow": {
-								"referenceName": "ARP_Dataflow_F1",
-								"type": "DataFlowReference",
-								"parameters": {
-									"Container": "\"synapse\"",
-									"Directory": "\"alastair/f1_data\"",
-									"DriversFileName": "\"drivers.csv\"",
-									"RaceFileName": "\"races.csv\"",
-									"ResultsFileName": "\"results.csv\""
-								},
-								"datasetParameters": {
-									"drivers": {},
-									"races": {},
-									"results": {},
-									"SinkToAzureSQLDB": {
-										"DatabaseName": "DataAcademyAP",
-										"SchemaName": "Practical",
-										"TableName": "Seasons"
-									}
-								}
-							},
-							"staging": {},
-							"compute": {
-								"coreCount": 8,
-								"computeType": "General"
-							},
-							"traceLevel": "Fine"
-						}
-					},
-					{
 						"name": "Stored procedure Remove Year",
 						"type": "SqlServerStoredProcedure",
 						"dependsOn": [
@@ -192,7 +74,7 @@
 						}
 					},
 					{
-						"name": "Set variable Files",
+						"name": "Set variable Year",
 						"type": "SetVariable",
 						"dependsOn": [],
 						"policy": {
@@ -201,19 +83,16 @@
 						},
 						"userProperties": [],
 						"typeProperties": {
-							"variableName": "Files",
-							"value": {
-								"value": "@concat(pipeline().parameters.DriversFileName, ' ', pipeline().parameters.RacesFileName, ' ', pipeline().parameters.ResultsFileName)",
-								"type": "Expression"
-							}
+							"variableName": "Year",
+							"value": 2007
 						}
 					},
 					{
-						"name": "Log Season Update Event Success",
-						"type": "SqlServerStoredProcedure",
+						"name": "LookupRowsForYear",
+						"type": "Lookup",
 						"dependsOn": [
 							{
-								"activity": "Data flow Season",
+								"activity": "Stored procedure Remove Year",
 								"dependencyConditions": [
 									"Succeeded"
 								]
@@ -228,101 +107,334 @@
 						},
 						"userProperties": [],
 						"typeProperties": {
-							"storedProcedureName": "[Log].[Season_UpdateEvent]",
-							"storedProcedureParameters": {
-								"Status": {
-									"value": "\"Succeeded\"",
-									"type": "String"
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "SELECT * FROM [@{pipeline().parameters.DBSchema}].[@{pipeline().parameters.DBTable}] WHERE 'year'='@{variables('Year')}';",
+									"type": "Expression"
 								},
-								"ErrorMessage": {
-									"value": null,
-									"type": "String"
-								},
-								"Season_EventId": {
-									"value": {
-										"value": "@activity('Log Season Insert Event').output.firstRow.Season_EventId",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "AzureSqlDataset",
+								"type": "DatasetReference",
+								"parameters": {
+									"DatabaseName": {
+										"value": "@pipeline().parameters.DBName",
 										"type": "Expression"
 									},
-									"type": "Guid"
+									"SchemaName": {
+										"value": "@pipeline().parameters.DBSchema",
+										"type": "Expression"
+									},
+									"TableName": {
+										"value": "@pipeline().parameters.DBTable",
+										"type": "Expression"
+									}
 								}
-							}
-						},
-						"linkedServiceName": {
-							"referenceName": "AzureSqlDatabase",
-							"type": "LinkedServiceReference",
-							"parameters": {
-								"DatabaseName": {
-									"value": "@pipeline().parameters.DBName",
-									"type": "Expression"
-								}
-							}
+							},
+							"firstRowOnly": false
 						}
 					},
 					{
-						"name": "Log Season Update Event Failure",
-						"type": "SqlServerStoredProcedure",
+						"name": "If RowsMissingRunDataFlow",
+						"type": "IfCondition",
 						"dependsOn": [
 							{
-								"activity": "Data flow Season",
+								"activity": "LookupRowsForYear",
 								"dependencyConditions": [
-									"Failed"
+									"Succeeded"
 								]
 							}
 						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
 						"userProperties": [],
 						"typeProperties": {
-							"storedProcedureName": "[Log].[Season_UpdateEvent]",
-							"storedProcedureParameters": {
-								"Status": {
-									"value": "\"Failed\"",
-									"type": "String"
-								},
-								"EndDateTime": {
-									"value": {
-										"value": "getdate()",
-										"type": "Expression"
+							"expression": {
+								"value": "@bool(activity('LookupRowsForYear').output.count)",
+								"type": "Expression"
+							},
+							"ifTrueActivities": [
+								{
+									"name": "Log Season Insert Event",
+									"type": "Lookup",
+									"dependsOn": [
+										{
+											"activity": "Set variable Files",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
 									},
-									"type": "Datetime"
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "AzureSqlSource",
+											"sqlReaderStoredProcedureName": "[Log].[Season_InsertEvent]",
+											"storedProcedureParameters": {
+												"Container": {
+													"type": "String",
+													"value": {
+														"value": "@pipeline().parameters.Container",
+														"type": "Expression"
+													}
+												},
+												"Directory": {
+													"type": "String",
+													"value": {
+														"value": "@pipeline().parameters.Directory",
+														"type": "Expression"
+													}
+												},
+												"Files": {
+													"type": "String",
+													"value": {
+														"value": "@variables('Files')",
+														"type": "Expression"
+													}
+												}
+											},
+											"queryTimeout": "02:00:00",
+											"partitionOption": "None"
+										},
+										"dataset": {
+											"referenceName": "AzureSqlDataset",
+											"type": "DatasetReference",
+											"parameters": {
+												"DatabaseName": {
+													"value": "@pipeline().parameters.DBName",
+													"type": "Expression"
+												},
+												"SchemaName": "NULL",
+												"TableName": "NULL"
+											}
+										}
+									}
 								},
-								"ErrorMessage": {
-									"value": {
-										"value": "@activity('Data flow Season').output.errors[0].Message",
-										"type": "Expression"
+								{
+									"name": "Set variable Files",
+									"type": "SetVariable",
+									"dependsOn": [],
+									"policy": {
+										"secureOutput": false,
+										"secureInput": false
 									},
-									"type": "String"
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "Files",
+										"value": {
+											"value": "@concat(pipeline().parameters.DriversFileName, ' ', pipeline().parameters.RacesFileName, ' ', pipeline().parameters.ResultsFileName)",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "Log Season Update Event Success",
+									"type": "SqlServerStoredProcedure",
+									"dependsOn": [
+										{
+											"activity": "Data flow Season",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"storedProcedureName": "[Log].[Season_UpdateEvent]",
+										"storedProcedureParameters": {
+											"Status": {
+												"value": "\"Succeeded\"",
+												"type": "String"
+											},
+											"ErrorMessage": {
+												"value": null,
+												"type": "String"
+											},
+											"Season_EventId": {
+												"value": {
+													"value": "@activity('Log Season Insert Event').output.firstRow.Season_EventId",
+													"type": "Expression"
+												},
+												"type": "Guid"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "AzureSqlDatabase",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"DatabaseName": {
+												"value": "@pipeline().parameters.DBName",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "Log Season Update Event Failure",
+									"type": "SqlServerStoredProcedure",
+									"dependsOn": [
+										{
+											"activity": "Data flow Season",
+											"dependencyConditions": [
+												"Failed"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"storedProcedureName": "[Log].[Season_UpdateEvent]",
+										"storedProcedureParameters": {
+											"Status": {
+												"value": "\"Failed\"",
+												"type": "String"
+											},
+											"EndDateTime": {
+												"value": {
+													"value": "getdate()",
+													"type": "Expression"
+												},
+												"type": "Datetime"
+											},
+											"ErrorMessage": {
+												"value": {
+													"value": "@activity('Data flow Season').output.errors[0].Message",
+													"type": "Expression"
+												},
+												"type": "String"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "AzureSqlDatabase",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"DatabaseName": {
+												"value": "@pipeline().parameters.DBName",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "Data flow Season",
+									"type": "ExecuteDataFlow",
+									"dependsOn": [
+										{
+											"activity": "Log Season Insert Event",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"dataflow": {
+											"referenceName": "ARP_Dataflow_F1",
+											"type": "DataFlowReference",
+											"parameters": {
+												"Container": "\"synapse\"",
+												"Directory": "\"alastair/f1_data\"",
+												"DriversFileName": "\"drivers.csv\"",
+												"RaceFileName": "\"races.csv\"",
+												"ResultsFileName": "\"results.csv\"",
+												"DBName": {
+													"value": "'@{pipeline().parameters.DBName}'",
+													"type": "Expression"
+												},
+												"FilterYear": {
+													"value": "'@{variables('Year')}'",
+													"type": "Expression"
+												}
+											},
+											"datasetParameters": {
+												"drivers": {
+													"Container": {
+														"value": "@pipeline().parameters.Container",
+														"type": "Expression"
+													},
+													"Directory": {
+														"value": "@pipeline().parameters.Directory",
+														"type": "Expression"
+													},
+													"FileName": {
+														"value": "@pipeline().parameters.DriversFileName",
+														"type": "Expression"
+													}
+												},
+												"races": {
+													"Container": {
+														"value": "@pipeline().parameters.Container",
+														"type": "Expression"
+													},
+													"Directory": {
+														"value": "@pipeline().parameters.Directory",
+														"type": "Expression"
+													},
+													"FileName": {
+														"value": "@pipeline().parameters.RacesFileName",
+														"type": "Expression"
+													}
+												},
+												"results": {
+													"Container": {
+														"value": "@pipeline().parameters.Container",
+														"type": "Expression"
+													},
+													"Directory": {
+														"value": "@pipeline().parameters.Directory",
+														"type": "Expression"
+													},
+													"FileName": {
+														"value": "@pipeline().parameters.ResultsFileName",
+														"type": "Expression"
+													}
+												},
+												"SinkToAzureSQLDB": {
+													"DatabaseName": "DataAcademyAP",
+													"SchemaName": "Practical",
+													"TableName": "Seasons"
+												}
+											}
+										},
+										"staging": {},
+										"compute": {
+											"coreCount": 8,
+											"computeType": "General"
+										},
+										"traceLevel": "Fine"
+									}
 								}
-							}
-						},
-						"linkedServiceName": {
-							"referenceName": "AzureSqlDatabase",
-							"type": "LinkedServiceReference",
-							"parameters": {
-								"DatabaseName": {
-									"value": "@pipeline().parameters.DBName",
-									"type": "Expression"
-								}
-							}
-						}
-					},
-					{
-						"name": "Set variable Year",
-						"type": "SetVariable",
-						"dependsOn": [],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "Year",
-							"value": 2000
+							]
 						}
 					}
 				],
@@ -373,7 +485,8 @@
 						"defaultValue": "\"@{pipeline().parameters.DriversFileName},@{pipeline().parameters.RacesFileName},@{pipeline().parameters.ResultsFileName}\""
 					},
 					"Year": {
-						"type": "Integer"
+						"type": "Integer",
+						"defaultValue": 2000
 					}
 				},
 				"folder": {
@@ -383,9 +496,9 @@
 				"lastPublishTime": "2024-06-13T16:08:53Z"
 			},
 			"dependsOn": [
+				"[concat(variables('workspaceId'), '/linkedServices/AzureSqlDatabase')]",
 				"[concat(variables('workspaceId'), '/datasets/AzureSqlDataset')]",
-				"[concat(variables('workspaceId'), '/dataflows/ARP_Dataflow_F1')]",
-				"[concat(variables('workspaceId'), '/linkedServices/AzureSqlDatabase')]"
+				"[concat(variables('workspaceId'), '/dataflows/ARP_Dataflow_F1')]"
 			]
 		},
 		{
@@ -1428,7 +1541,48 @@
 				},
 				"annotations": [],
 				"type": "AzureSqlTable",
-				"schema": [],
+				"schema": [
+					{
+						"name": "Id",
+						"type": "uniqueidentifier"
+					},
+					{
+						"name": "year",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "round",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "raceName",
+						"type": "varchar"
+					},
+					{
+						"name": "driverFullname",
+						"type": "varchar"
+					},
+					{
+						"name": "code",
+						"type": "varchar"
+					},
+					{
+						"name": "position",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "points",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "fastestLaptime",
+						"type": "varchar"
+					}
+				],
 				"typeProperties": {
 					"schema": {
 						"value": "@dataset().SchemaName",
@@ -1709,25 +1863,25 @@
 				"typeProperties": {
 					"sources": [
 						{
-							"linkedService": {
-								"referenceName": "answer-data-academy-WorkspaceDefaultStorage",
-								"type": "LinkedServiceReference"
+							"dataset": {
+								"referenceName": "DataLakeTextDataset",
+								"type": "DatasetReference"
 							},
 							"name": "drivers",
 							"description": "Import drivers data"
 						},
 						{
-							"linkedService": {
-								"referenceName": "answer-data-academy-WorkspaceDefaultStorage",
-								"type": "LinkedServiceReference"
+							"dataset": {
+								"referenceName": "DataLakeTextDataset",
+								"type": "DatasetReference"
 							},
 							"name": "races",
 							"description": "Add races data"
 						},
 						{
-							"linkedService": {
-								"referenceName": "answer-data-academy-WorkspaceDefaultStorage",
-								"type": "LinkedServiceReference"
+							"dataset": {
+								"referenceName": "DataLakeTextDataset",
+								"type": "DatasetReference"
 							},
 							"name": "results",
 							"description": "Import results data"
@@ -1767,14 +1921,14 @@
 							"name": "RemoveSurplusColumns"
 						},
 						{
-							"name": "ReplaceRowsNotNull"
+							"name": "castPositionInteger",
+							"description": "Cast position to integer"
 						},
 						{
-							"name": "alterRowPermitAll"
+							"name": "derivedColumnReplaceEndlines"
 						},
 						{
-							"name": "castPointsToInt",
-							"description": "Cast Points column to type integer"
+							"name": "filterByYear"
 						}
 					],
 					"scriptLines": [
@@ -1783,10 +1937,12 @@
 						"     Directory as string (\"alastair/f1_data\"),",
 						"     DriversFileName as string (\"drivers.csv\"),",
 						"     RaceFileName as string (\"races.csv\"),",
-						"     ResultsFileName as string (\"results.csv\")",
+						"     ResultsFileName as string (\"results.csv\"),",
+						"     DBName as string (\"DataAcademyAP\"),",
+						"     FilterYear as string (\"2007\")",
 						"}",
 						"source(output(",
-						"          driverId as integer,",
+						"          driverId as short,",
 						"          driverRef as string,",
 						"          number as string,",
 						"          code as string,",
@@ -1796,26 +1952,17 @@
 						"          nationality as string,",
 						"          url as string",
 						"     ),",
-						"     useSchema: false,",
 						"     allowSchemaDrift: true,",
 						"     validateSchema: false,",
-						"     ignoreNoFilesFound: false,",
-						"     format: 'delimited',",
-						"     fileSystem: ($Container),",
-						"     folderPath: ($Directory),",
-						"     fileName: ($DriversFileName),",
-						"     columnDelimiter: ',',",
-						"     escapeChar: '\\\\',",
-						"     quoteChar: '\\\"',",
-						"     columnNamesAsHeader: true) ~> drivers",
+						"     ignoreNoFilesFound: false) ~> drivers",
 						"source(output(",
-						"          raceId as integer,",
-						"          year as integer,",
-						"          round as integer,",
-						"          circuitId as integer,",
+						"          raceId as short,",
+						"          year as short,",
+						"          round as short,",
+						"          circuitId as short,",
 						"          name as string,",
-						"          date as date 'yyyy-MM-dd',",
-						"          time as timestamp 'yyyy-MM-dd\\'T\\'HH:mm:ss.SSS\\'Z\\'',",
+						"          date as date,",
+						"          time as string,",
 						"          url as string,",
 						"          fp1_date as string,",
 						"          fp1_time as string,",
@@ -1828,50 +1975,32 @@
 						"          sprint_date as string,",
 						"          sprint_time as string",
 						"     ),",
-						"     useSchema: false,",
 						"     allowSchemaDrift: true,",
 						"     validateSchema: false,",
-						"     ignoreNoFilesFound: false,",
-						"     format: 'delimited',",
-						"     fileSystem: ($Container),",
-						"     folderPath: ($Directory),",
-						"     fileName: ($RaceFileName),",
-						"     columnDelimiter: ',',",
-						"     escapeChar: '\\\\',",
-						"     quoteChar: '\\\"',",
-						"     columnNamesAsHeader: true) ~> races",
+						"     ignoreNoFilesFound: false) ~> races",
 						"source(output(",
-						"          resultId as integer,",
-						"          raceId as integer,",
-						"          driverId as integer,",
-						"          constructorId as integer,",
-						"          number as integer,",
-						"          grid as integer,",
+						"          resultId as short,",
+						"          raceId as short,",
+						"          driverId as short,",
+						"          constructorId as short,",
+						"          number as short,",
+						"          grid as short,",
 						"          position as string,",
 						"          positionText as string,",
-						"          positionOrder as integer,",
-						"          points as integer,",
-						"          laps as integer,",
+						"          positionOrder as short,",
+						"          points as short,",
+						"          laps as short,",
 						"          time as string,",
 						"          milliseconds as string,",
 						"          fastestLap as string,",
 						"          rank as string,",
 						"          fastestLapTime as string,",
 						"          fastestLapSpeed as string,",
-						"          statusId as integer",
+						"          statusId as short",
 						"     ),",
-						"     useSchema: false,",
 						"     allowSchemaDrift: true,",
 						"     validateSchema: false,",
-						"     ignoreNoFilesFound: false,",
-						"     format: 'delimited',",
-						"     fileSystem: ($Container),",
-						"     folderPath: ($Directory),",
-						"     fileName: ($ResultsFileName),",
-						"     columnDelimiter: ',',",
-						"     escapeChar: '\\\\',",
-						"     quoteChar: '\\\"',",
-						"     columnNamesAsHeader: true) ~> results",
+						"     ignoreNoFilesFound: false) ~> results",
 						"results, races join(results@raceId == races@raceId,",
 						"     joinType:'left',",
 						"     matchType:'exact',",
@@ -1882,7 +2011,7 @@
 						"     matchType:'exact',",
 						"     ignoreSpaces: false,",
 						"     broadcast: 'auto')~> LeftJoinDrivers",
-						"LeftJoinDrivers derive(Id = uuid()) ~> AddUUID",
+						"filterByYear derive(Id = uuid()) ~> AddUUID",
 						"AddUUID derive(driverFullname = concat(forename, \" \", surname)) ~> ConcatdriverFullname",
 						"ConcatdriverFullname derive(year = year(date)) ~> AddYear",
 						"AddYear select(mapColumn(",
@@ -1898,36 +2027,58 @@
 						"     ),",
 						"     skipDuplicateMapInputs: true,",
 						"     skipDuplicateMapOutputs: true) ~> RemoveSurplusColumns",
-						"alterRowPermitAll derive(fastestLapTime = case(\r",
+						"derivedColumnReplaceEndlines cast(output(",
+						"          position as integer",
+						"     ),",
+						"     errors: true) ~> castPositionInteger",
+						"RemoveSurplusColumns derive(fastestLapTime = case(\r",
 						"    fastestLapTime=='\\\\N', '00:00:00',\r",
 						"    fastestLapTime!='\\\\N', fastestLapTime\r",
 						"    ),",
 						"          position = case(\r",
 						"    position=='\\\\N', '0',\r",
 						"    position!='\\\\N', position\r",
-						"    )) ~> ReplaceRowsNotNull",
-						"RemoveSurplusColumns alterRow(updateIf(true())) ~> alterRowPermitAll",
-						"ReplaceRowsNotNull cast(output(",
-						"          position as integer '000'",
-						"     ),",
-						"     errors: true) ~> castPointsToInt",
-						"castPointsToInt sink(allowSchemaDrift: true,",
+						"    )) ~> derivedColumnReplaceEndlines",
+						"LeftJoinDrivers filter(year == toInteger($FilterYear)) ~> filterByYear",
+						"castPositionInteger sink(allowSchemaDrift: true,",
 						"     validateSchema: false,",
+						"     input(",
+						"          Id as string,",
+						"          year as integer,",
+						"          round as integer,",
+						"          raceName as string,",
+						"          driverFullname as string,",
+						"          code as string,",
+						"          position as integer,",
+						"          points as integer,",
+						"          fastestLaptime as string",
+						"     ),",
 						"     deletable:false,",
 						"     insertable:true,",
-						"     updateable:true,",
+						"     updateable:false,",
 						"     upsertable:false,",
-						"     keys:['Id'],",
 						"     format: 'table',",
 						"     skipDuplicateMapInputs: true,",
 						"     skipDuplicateMapOutputs: true,",
-						"     errorHandlingOption: 'stopOnFirstError') ~> SinkToAzureSQLDB"
+						"     errorHandlingOption: 'stopOnFirstError',",
+						"     mapColumn(",
+						"          Id,",
+						"          year,",
+						"          round,",
+						"          raceName,",
+						"          driverFullname,",
+						"          code,",
+						"          position,",
+						"          points,",
+						"          fastestLaptime = fastestLapTime",
+						"     )) ~> SinkToAzureSQLDB"
 					]
 				}
 			},
 			"dependsOn": [
-				"[concat(variables('workspaceId'), '/linkedServices/answer-data-academy-WorkspaceDefaultStorage')]",
-				"[concat(variables('workspaceId'), '/datasets/AzureSqlDataset')]"
+				"[concat(variables('workspaceId'), '/datasets/DataLakeTextDataset')]",
+				"[concat(variables('workspaceId'), '/datasets/AzureSqlDataset')]",
+				"[concat(variables('workspaceId'), '/linkedServices/answer-data-academy-WorkspaceDefaultStorage')]"
 			]
 		},
 		{
